@@ -218,7 +218,7 @@ lock-файл создан: base.lock (pid=12345)
 .
 ├── main.go                     # точка входа, роутинг, конфиг
 ├── config.go                   # загрузка и валидация config.json
-├── config.example.json         # шаблон конфига без секретов
+├── config.example.json         # шаблон конфига
 ├── db.go                       # БД, схемы, CRUD
 ├── backup.go                   # фоновое резервирование
 ├── lock.go                     # защита от двойного запуска
@@ -226,7 +226,7 @@ lock-файл создан: base.lock (pid=12345)
 ├── middleware.go               # requireAuth / requireAdmin
 ├── audit.go                    # аудит действий
 ├── validators.go               # валидация имён
-├── password_gen.go             # криптографический генератор паролей
+├── password_gen.go             # генератор паролей
 ├── templates.go                # парсинг html-шаблонов
 ├── handlers_login.go           # вход/выход
 ├── handlers_logout.go
@@ -255,7 +255,7 @@ lock-файл создан: base.lock (pid=12345)
 ## Сборка
 
 ```
-go build -o app .
+go build -o timesheets .
 ```
 
 Кросс-компиляция (пример: Linux amd64 → Windows amd64, Linux arm64):
