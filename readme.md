@@ -270,12 +270,3 @@ GOOS=linux   GOARCH=arm64 go build -o timesheets-linux-arm64 .
 ```
 go build -trimpath -ldflags "-s -w" -o timesheets .
 ```
-
----
-
-## Документация
-
-- [Руководство пользователя](web/static/guide.html) — доступно на странице входа.
-- [Руководство администратора](web/static/admin-guide.html) — доступно на странице конфигурации (иконка «книга» рядом с «Пользователь»).
-
-Внутри приложения оба документа открываются в новой вкладке.
