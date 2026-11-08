@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <form class="login-box" method="POST" action="/login">
+        <h1>Вход в систему</h1>
+
+        <div class="field">
+            <label for="username">Имя пользователя</label>
+            <input type="text" id="username" name="username" required autocomplete="username">
+        </div>
+
+        <div class="field">
+            <label for="password">Пароль</label>
+            <input type="password" id="password" name="password" required autocomplete="current-password">
+        </div>
+
+        <button type="submit">Войти</button>
+
+        {{if .Error}}
+        <div class="error">{{.Error}}</div>
+        {{end}}
+
+        <div class="login-note">
+            Обратите внимание: редактирование записей табеля доступно только за последние {{.WorkEntriesEditDays}} дн.
+        </div>
+
+        <div class="login-help">
+            <a href="/static/guide.html" target="_blank" rel="noopener">Руководство пользователя</a>
+        </div>
+    </form>
+</body>
+</html>

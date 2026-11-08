@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Табели учёта рабочего времени</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="page-top">
+    <div class="config-box">
+        <h1>Табели учёта рабочего времени</h1>
+
+        {{if .ViewedEmployeeID}}
+        <p class="subtitle">
+            {{if .FullName}}Сотрудник: <span class="username">{{.FullName}}</span>{{end}}
+            {{if .GroupName}} · Отдел: <span class="username">{{.GroupName}}</span>{{end}}
+        </p>
+        {{end}}
+
+        <div class="actions">
+            {{if .ViewedEmployeeID}}
+            <button type="button" class="btn" id="openAddWorkModalBtn">Добавить работы</button>
+            <button type="button" class="btn btn-secondary" id="openExportModalBtn">Экспорт в Excel</button>
+            {{end}}
+            {{if eq .Role "admin"}}
+            <a class="btn btn-secondary" href="/config">К конфигурации</a>
+            {{end}}
+            <button type="button" class="btn btn-secondary" id="openLogoutModalBtn">Выйти</button>
+        </div>
+
+        <div class="section-title">Записи табеля</div>
+
+        {{if .WorkEntries}}
+        <table class="data-table timesheet-table" id="works-table">
+            <thead>
+                <tr>
+                    <th>№</th>
+                    <th>Дата</th>
+                    <th>Начало</th>
+                    <th>Окончание</th>
+                    <th>Длительность<br>(Часы:Минуты)</th>
+                    <th>Объект/проект</th>
+                    <th class="comment-col">Вид работ</th>
+                    <th class="actions-col-icon">Действия</th>
+                </tr>
+            </thead>
+            <tbody id="works-tbody">
+                {{range $i, $w := .WorkEntries}}
+                <tr{{if isWeekend $w.WorkDate}} class="weekend"{{end}}>
+                    <td class="id-col">{{inc $i}}</td>
+                    <td>{{$w.WorkDate}}</td>
+                    <td>{{$w.StartTime}}</td>
+                    <td>{{endTime $w.StartTime $w.DurationMinutes}}</td>
+                    <td>{{durationHHMM $w.DurationMinutes}}</td>
+                    <td>{{$w.ProjectCode}}</td>
+                    <td class="comment-col">{{if $w.Comment}}{{$w.Comment}}{{else}}—{{end}}</td>
+                    <td class="actions-col-icon">
+                        {{if isEditableWorkDate $.Role $w.WorkDate}}
+                        <button
+                            type="button"
+                            class="icon-btn"
+                            title="Изменить"
+                            aria-label="Изменить"
+                            data-action="edit-work"
+                            data-id="{{$w.ID}}"
+                            data-work-date="{{$w.WorkDate}}"
+                            data-start-time="{{$w.StartTime}}"
+                            data-duration-minutes="{{$w.DurationMinutes}}"
+                            data-project-id="{{$w.ProjectID}}"
+                            data-comment="{{$w.Comment}}">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/>
+                            </svg>
+                        </button>
+                        <form method="POST" action="/timesheets/works/delete?works_month={{$.WorksMonth}}" class="inline-form"
+                              onsubmit="return confirm('Удалить запись от {{$w.WorkDate}} {{$w.StartTime}}?');">
+                            <input type="hidden" name="id" value="{{$w.ID}}">
+                            {{if eq $.Role "admin"}}
+                            <input type="hidden" name="employee_id" value="{{$.ViewedEmployeeID}}">
+                            {{end}}
+                            <button type="submit" class="icon-btn danger" title="Удалить" aria-label="Удалить">
+                                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5L11 4M7 7v4M9 7v4"/>
+                                </svg>
+                            </button>
+                        </form>
+                        {{else}}
+                        <span class="icon-btn locked" title="Запись старше установленного срока — изменение и удаление запрещены" aria-label="Заблокировано">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="3" y="7" width="10" height="7" rx="1"/>
+                                <path d="M5 7V5a3 3 0 0 1 6 0v2"/>
+                            </svg>
+                        </span>
+                        {{end}}
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{else}}
+        <div class="empty">Пока нет ни одной записи</div>
+        {{end}}
+
+        <div class="pagination" id="works-pagination"
+             data-month="{{.WorksMonth}}">
+            <a class="page-link{{if not .WorksCanPrev}} disabled{{end}}"
+               data-ajax-month="works"
+               {{if .WorksCanPrev}}href="/timesheets?{{if eq .Role "admin"}}employee_id={{.ViewedEmployeeID}}&{{end}}works_month={{.WorksPrevMonth}}"{{end}}>
+                ← Предыдущий
+            </a>
+            <span class="page-link current">{{.WorksMonthLabel}}</span>
+            <a class="page-link{{if not .WorksCanNext}} disabled{{end}}"
+               data-ajax-month="works"
+               {{if .WorksCanNext}}href="/timesheets?{{if eq .Role "admin"}}employee_id={{.ViewedEmployeeID}}&{{end}}works_month={{.WorksNextMonth}}"{{end}}>
+                Следующий →
+            </a>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="addWorkModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="addWorkModalTitle">
+            <h2 id="addWorkModalTitle">Добавить работы</h2>
+
+            <form method="POST" action="/timesheets/works?works_month={{.WorksMonth}}" id="addWorkForm">
+                {{if eq .Role "admin"}}
+                <input type="hidden" name="employee_id" value="{{.ViewedEmployeeID}}">
+                {{end}}
+
+                <div class="field">
+                    <label for="workDate">Дата работ</label>
+                    <input type="date" id="workDate" name="work_date" required
+                           {{if ne .Role "admin"}}min="{{minWorkDate}}"{{end}} max="{{maxWorkDate}}" value="{{.AddWorkDate}}">
+                </div>
+
+                <div class="field">
+                    <label for="workStart">Время начала</label>
+                    <input type="time" id="workStart" name="start_time" required value="{{.AddWorkStart}}">
+                </div>
+
+                <div class="field">
+                    <span class="hint-small">Как задать длительность:</span>
+                    <div class="radio-row">
+                        <label>
+                            <input type="radio" name="mode" value="end" {{if ne .AddWorkMode "duration"}}checked{{end}}>
+                            по времени окончания
+                        </label>
+                        <label>
+                            <input type="radio" name="mode" value="duration" {{if eq .AddWorkMode "duration"}}checked{{end}}>
+                            в часах и минутах
+                        </label>
+                    </div>
+                </div>
+
+                <div class="field" id="endTimeField">
+                    <label for="workEnd">Время окончания</label>
+                    <input type="time" id="workEnd" name="end_time" value="{{.AddWorkEnd}}">
+                </div>
+
+                <div class="field" id="durationField" style="display:none;">
+                    <label>Длительность</label>
+                    <div class="duration-row">
+                        <input type="number" id="durH" name="duration_h" min="0" max="8" value="{{if .AddWorkDurationH}}{{.AddWorkDurationH}}{{else}}0{{end}}">
+                        <span>ч.</span>
+                        <input type="number" id="durM" name="duration_m" min="0" max="59" value="{{if .AddWorkDurationM}}{{.AddWorkDurationM}}{{else}}0{{end}}">
+                        <span>мин.</span>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="workProject">Объект/проект</label>
+                    <select id="workProject" name="project_id" required>
+                        <option value="">— выберите объект —</option>
+                        {{range .Projects}}
+                        <option value="{{.ID}}" {{if eq .ID $.AddWorkProjectID}}selected{{end}}>{{.Code}}</option>
+                        {{end}}
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="workComment">Вид работ <span class="optional">(обязательно, до 512 символов)</span></label>
+                    <textarea id="workComment" name="comment" required maxlength="512" rows="3">{{.AddWorkComment}}</textarea>
+                </div>
+
+                <div class="modal-error" id="addWorkModalError">{{.WorkError}}</div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" data-close="add-work">Отмена</button>
+                    <button type="submit" class="btn">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="editWorkModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editWorkModalTitle">
+            <h2 id="editWorkModalTitle">Редактировать запись табеля</h2>
+
+            <form method="POST" action="/timesheets/works/edit?works_month={{.WorksMonth}}" id="editWorkForm">
+                <input type="hidden" name="id" id="editWorkId">
+                {{if eq .Role "admin"}}
+                <input type="hidden" name="employee_id" value="{{.ViewedEmployeeID}}">
+                {{end}}
+
+                <div class="field">
+                    <label for="editWorkDate">Дата работ</label>
+                    <input type="date" id="editWorkDate" name="work_date" required
+                           {{if ne .Role "admin"}}min="{{minWorkDate}}"{{end}} max="{{maxWorkDate}}">
+                </div>
+
+                <div class="field">
+                    <label for="editWorkStart">Время начала</label>
+                    <input type="time" id="editWorkStart" name="start_time" required>
+                </div>
+
+                <div class="field">
+                    <span class="hint-small">Как задать длительность:</span>
+                    <div class="radio-row">
+                        <label>
+                            <input type="radio" name="mode" value="end" {{if ne .EditWorkMode "duration"}}checked{{end}}>
+                            по времени окончания
+                        </label>
+                        <label>
+                            <input type="radio" name="mode" value="duration" {{if eq .EditWorkMode "duration"}}checked{{end}}>
+                            в часах и минутах
+                        </label>
+                    </div>
+                </div>
+
+                <div class="field" id="editEndTimeField">
+                    <label for="editWorkEnd">Время окончания</label>
+                    <input type="time" id="editWorkEnd" name="end_time">
+                </div>
+
+                <div class="field" id="editDurationField" style="display:none;">
+                    <label>Длительность</label>
+                    <div class="duration-row">
+                        <input type="number" id="editDurH" name="duration_h" min="0" max="8" value="{{if .EditWorkDurationH}}{{.EditWorkDurationH}}{{else}}0{{end}}">
+                        <span>ч.</span>
+                        <input type="number" id="editDurM" name="duration_m" min="0" max="59" value="{{if .EditWorkDurationM}}{{.EditWorkDurationM}}{{else}}0{{end}}">
+                        <span>мин.</span>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="editWorkProject">Объект/проект</label>
+                    <select id="editWorkProject" name="project_id" required>
+                        <option value="">— выберите объект —</option>
+                        {{range .Projects}}
+                        <option value="{{.ID}}">{{.Code}}</option>
+                        {{end}}
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="editWorkComment">Вид работ <span class="optional">(обязательно, до 512 символов)</span></label>
+                    <textarea id="editWorkComment" name="comment" required maxlength="512" rows="3"></textarea>
+                </div>
+
+                <div class="modal-error" id="editWorkModalError">{{.EditWorkError}}</div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" data-close="edit-work">Отмена</button>
+                    <button type="submit" class="btn">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="exportModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="exportModalTitle">
+            <h2 id="exportModalTitle">Экспорт табеля в Excel</h2>
+
+            <p class="hint-small">Выберите, что выгрузить:</p>
+
+            <div class="export-scope-wrapper">
+                <label class="export-radio-label">
+                    <input type="radio" name="export_scope" value="month" checked class="export-radio-input">
+                    <span class="export-radio-text">Текущий месяц (<span id="exportCurrentMonthLabel">{{.WorksMonthLabel}}</span>)</span>
+                </label>
+                <label class="export-radio-label">
+                    <input type="radio" name="export_scope" value="all" class="export-radio-input">
+                    <span class="export-radio-text">Все месяцы (каждый месяц — отдельная вкладка)</span>
+                </label>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" data-close="export">Отмена</button>
+                <a class="btn" id="exportConfirmBtn"
+                   href="/timesheets/export?{{if eq .Role "admin"}}employee_id={{.ViewedEmployeeID}}&{{end}}works_month={{.WorksMonth}}&scope=month">
+                    Выгрузить
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="logoutModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="logoutModalTitle">
+            <h2 id="logoutModalTitle">Выход из системы</h2>
+            <p class="modal-question">Вы действительно хотите выйти?</p>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" data-close="logout">Отмена</button>
+                <a class="btn" href="/logout">Выйти</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const currentUserRole = "{{.Role}}";
+            const minWorkDate = "{{minWorkDate}}";
+
+            function setupModal(overlayId, openBtnId, errorId, tag) {
+                const overlay = document.getElementById(overlayId);
+                const openBtn = openBtnId ? document.getElementById(openBtnId) : null;
+                const errorEl = errorId ? document.getElementById(errorId) : null;
+
+                function openModal() {
+                    overlay.classList.add('open');
+                    const firstInput = overlay.querySelector('input:not([disabled]):not([type=hidden]), select, textarea, button, a.btn');
+                    if (firstInput) firstInput.focus();
+                }
+                function closeModal() {
+                    overlay.classList.remove('open');
+                    if (errorEl) errorEl.textContent = '';
+                }
+
+                if (openBtn) openBtn.addEventListener('click', openModal);
+                overlay.querySelectorAll('[data-close="' + tag + '"]').forEach(function (b) {
+                    b.addEventListener('click', closeModal);
+                });
+                overlay.addEventListener('click', function (e) {
+                    if (e.target === overlay) closeModal();
+                });
+                return { overlay: overlay, open: openModal, close: closeModal, errorEl: errorEl };
+            }
+
+            const addWorkModal = setupModal('addWorkModalOverlay', 'openAddWorkModalBtn', 'addWorkModalError', 'add-work');
+            const editWorkModal = setupModal('editWorkModalOverlay', null, 'editWorkModalError', 'edit-work');
+            const exportModal = setupModal('exportModalOverlay', 'openExportModalBtn', null, 'export');
+            const logoutModal = setupModal('logoutModalOverlay', 'openLogoutModalBtn', null, 'logout');
+
+            const endField = document.getElementById('endTimeField');
+            const durField = document.getElementById('durationField');
+            document.querySelectorAll('#addWorkForm input[name="mode"]').forEach(function (r) {
+                r.addEventListener('change', function () {
+                    const mode = document.querySelector('#addWorkForm input[name="mode"]:checked').value;
+                    if (mode === 'end') { endField.style.display = ''; durField.style.display = 'none'; }
+                    else { endField.style.display = 'none'; durField.style.display = ''; }
+                });
+            });
+            (function () {
+                const mode = document.querySelector('#addWorkForm input[name="mode"]:checked').value;
+                if (mode === 'end') { endField.style.display = ''; durField.style.display = 'none'; }
+                else { endField.style.display = 'none'; durField.style.display = ''; }
+            })();
+
+            const editEndField = document.getElementById('editEndTimeField');
+            const editDurField = document.getElementById('editDurationField');
+            function syncEditMode() {
+                const mode = document.querySelector('#editWorkForm input[name="mode"]:checked').value;
+                if (mode === 'end') { editEndField.style.display = ''; editDurField.style.display = 'none'; }
+                else { editEndField.style.display = 'none'; editDurField.style.display = ''; }
+            }
+            document.querySelectorAll('#editWorkForm input[name="mode"]').forEach(function (r) {
+                r.addEventListener('change', syncEditMode);
+            });
+            syncEditMode();
+
+            function fillEditWorkModal(d) {
+                document.getElementById('editWorkId').value = d.id;
+                document.getElementById('editWorkDate').value = d.workDate;
+                document.getElementById('editWorkStart').value = d.startTime;
+
+                const total = parseInt(d.durationMinutes, 10) || 0;
+                document.getElementById('editDurH').value = Math.floor(total / 60);
+                document.getElementById('editDurM').value = total % 60;
+
+                document.getElementById('editWorkProject').value = d.projectId;
+                document.getElementById('editWorkComment').value = d.comment || '';
+
+                const radios = document.querySelectorAll('#editWorkForm input[name="mode"]');
+                radios.forEach(function (r) { r.checked = (r.value === 'duration'); });
+                syncEditMode();
+
+                editWorkModal.errorEl.textContent = '';
+                editWorkModal.open();
+            }
+
+            document.querySelectorAll('button[data-action="edit-work"]').forEach(function (btn) {
+                btn.addEventListener('click', function () { fillEditWorkModal(btn.dataset); });
+            });
+
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') {
+                    [addWorkModal, editWorkModal, exportModal, logoutModal].forEach(function (m) {
+                        if (m.overlay.classList.contains('open')) m.overlay.classList.remove('open');
+                    });
+                }
+            });
+
+            if (addWorkModal.errorEl && addWorkModal.errorEl.textContent.trim() !== '') addWorkModal.open();
+            if (editWorkModal.errorEl && editWorkModal.errorEl.textContent.trim() !== '') editWorkModal.open();
+
+            function buildExportURL(scope, month) {
+                const p = new URLSearchParams();
+                const seed = new URL(
+                    '/timesheets/export?{{if eq .Role "admin"}}employee_id={{.ViewedEmployeeID}}&{{end}}works_month={{.WorksMonth}}&scope=month',
+                    window.location.origin
+                );
+                const empId = seed.searchParams.get('employee_id');
+                if (empId) p.set('employee_id', empId);
+                p.set('works_month', month || '');
+                p.set('scope', scope);
+                return '/timesheets/export?' + p.toString();
+            }
+
+            const exportConfirmBtn = document.getElementById('exportConfirmBtn');
+
+            function syncExportURL() {
+                const scopeEl = document.querySelector('#exportModalOverlay input[name="export_scope"]:checked');
+                const scope = scopeEl ? scopeEl.value : 'month';
+                const pagination = document.getElementById('works-pagination');
+                const month = (pagination && pagination.dataset.month) || '{{.WorksMonth}}';
+                if (exportConfirmBtn) exportConfirmBtn.href = buildExportURL(scope, month);
+            }
+
+            document.querySelectorAll('#exportModalOverlay input[name="export_scope"]').forEach(function (r) {
+                r.addEventListener('change', syncExportURL);
+            });
+            syncExportURL();
+
+            const worksTbody = document.getElementById('works-tbody');
+            const worksPagination = document.getElementById('works-pagination');
+
+            if (worksPagination) {
+                function isWeekendDate(isoDate) {
+                    const parts = String(isoDate || '').split('-');
+                    if (parts.length !== 3) return false;
+                    const d = new Date(Date.UTC(
+                        parseInt(parts[0], 10),
+                        parseInt(parts[1], 10) - 1,
+                        parseInt(parts[2], 10)
+                    ));
+                    const wd = d.getUTCDay();
+                    return wd === 0 || wd === 6;
+                }
+
+                function buildWorkRow(w, idx) {
+                    const tr = document.createElement('tr');
+                    if (isWeekendDate(w.work_date)) tr.classList.add('weekend');
+
+                    const tdId = document.createElement('td');
+                    tdId.className = 'id-col';
+                    tdId.textContent = String(idx + 1);
+                    tr.appendChild(tdId);
+
+                    const tdDate = document.createElement('td');
+                    tdDate.textContent = w.work_date;
+                    tr.appendChild(tdDate);
+
+                    const tdStart = document.createElement('td');
+                    tdStart.textContent = w.start_time;
+                    tr.appendChild(tdStart);
+
+                    const startParts = (w.start_time || '').split(':');
+                    let endText = '';
+                    if (startParts.length === 2) {
+                        const total = (parseInt(startParts[0], 10) || 0) * 60
+                            + (parseInt(startParts[1], 10) || 0)
+                            + (w.duration_minutes || 0);
+                        const hh = Math.floor((total % 1440) / 60);
+                        const mm = total % 60;
+                        endText = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+                    }
+                    const tdEnd = document.createElement('td');
+                    tdEnd.textContent = endText;
+                    tr.appendChild(tdEnd);
+
+                    const totalDur = w.duration_minutes || 0;
+                    const tdDur = document.createElement('td');
+                    tdDur.textContent = String(Math.floor(totalDur / 60)).padStart(2, '0') + ':' + String(totalDur % 60).padStart(2, '0');
+                    tr.appendChild(tdDur);
+
+                    const tdProject = document.createElement('td');
+                    tdProject.textContent = w.project_code;
+                    tr.appendChild(tdProject);
+
+                    const tdComment = document.createElement('td');
+                    tdComment.className = 'comment-col';
+                    tdComment.textContent = w.comment ? w.comment : '—';
+                    tr.appendChild(tdComment);
+
+                    const tdActions = document.createElement('td');
+                    tdActions.className = 'actions-col-icon';
+
+                    const canEdit = currentUserRole === 'admin' || (w.work_date >= minWorkDate);
+
+                    if (canEdit) {
+                        const editBtn = document.createElement('button');
+                        editBtn.type = 'button';
+                        editBtn.className = 'icon-btn';
+                        editBtn.title = 'Изменить';
+                        editBtn.dataset.action = 'edit-work';
+                        editBtn.dataset.id = String(w.id);
+                        editBtn.dataset.workDate = w.work_date;
+                        editBtn.dataset.startTime = w.start_time;
+                        editBtn.dataset.durationMinutes = String(w.duration_minutes);
+                        editBtn.dataset.projectId = String(w.project_id);
+                        editBtn.dataset.comment = w.comment;
+                        editBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/></svg>';
+                        editBtn.addEventListener('click', function () { fillEditWorkModal(editBtn.dataset); });
+                        tdActions.appendChild(editBtn);
+
+                        const form = document.createElement('form');
+                        form.method = 'POST';
+                        form.className = 'inline-form';
+                        form.action = '/timesheets/works/delete' + window.location.search;
+                        form.onsubmit = function () {
+                            return confirm('Удалить запись от ' + w.work_date + ' ' + w.start_time + '?');
+                        };
+                        const hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = 'id';
+                        hidden.value = String(w.id);
+                        form.appendChild(hidden);
+                        const delBtn = document.createElement('button');
+                        delBtn.type = 'submit';
+                        delBtn.className = 'icon-btn danger';
+                        delBtn.title = 'Удалить';
+                        delBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5L11 4M7 7v4M9 7v4"/></svg>';
+                        form.appendChild(delBtn);
+                        tdActions.appendChild(form);
+                    } else {
+                        const lockedSpan = document.createElement('span');
+                        lockedSpan.className = 'icon-btn locked';
+                        lockedSpan.title = 'Запись старше установленного срока — изменение и удаление запрещены';
+                        lockedSpan.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg>';
+                        tdActions.appendChild(lockedSpan);
+                    }
+
+                    tr.appendChild(tdActions);
+                    return tr;
+                }
+
+                function renderWorks(works) {
+                    if (!worksTbody) return;
+                    const rows = works.map(buildWorkRow);
+                    worksTbody.replaceChildren.apply(worksTbody, rows);
+                }
+
+                function renderWorksMonthNav(month, label, prevMonth, nextMonth, canPrev, canNext) {
+                    worksPagination.replaceChildren();
+                    worksPagination.dataset.month = month || '';
+
+                    const prev = document.createElement(canPrev ? 'a' : 'span');
+                    prev.className = 'page-link' + (canPrev ? '' : ' disabled');
+                    prev.textContent = '← Предыдущий';
+                    if (canPrev) {
+                        prev.dataset.ajaxMonth = 'works';
+                        const p = new URLSearchParams(window.location.search);
+                        p.set('works_month', prevMonth);
+                        prev.href = '/timesheets?' + p.toString();
+                    }
+                    worksPagination.appendChild(prev);
+
+                    const cur = document.createElement('span');
+                    cur.className = 'page-link current';
+                    cur.textContent = label || month || '';
+                    worksPagination.appendChild(cur);
+
+                    const next = document.createElement(canNext ? 'a' : 'span');
+                    next.className = 'page-link' + (canNext ? '' : ' disabled');
+                    next.textContent = 'Следующий →';
+                    if (canNext) {
+                        next.dataset.ajaxMonth = 'works';
+                        const p = new URLSearchParams(window.location.search);
+                        p.set('works_month', nextMonth);
+                        next.href = '/timesheets?' + p.toString();
+                    }
+                    worksPagination.appendChild(next);
+
+                    const labelEl = document.getElementById('exportCurrentMonthLabel');
+                    if (labelEl) labelEl.textContent = label || month || '';
+                    syncExportURL();
+                }
+
+                function fetchWorksMonth(month) {
+                    const params = new URLSearchParams(window.location.search);
+                    params.set('works_month', month);
+                    params.set('partial', 'works');
+
+                    fetch('/timesheets?' + params.toString(), {
+                        method: 'GET', headers: { 'Accept': 'application/json' }, credentials: 'same-origin',
+                    })
+                        .then(function (resp) {
+                            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                            return resp.json();
+                        })
+                        .then(function (data) {
+                            renderWorks(data.works || []);
+                            renderWorksMonthNav(
+                                data.works_month || month,
+                                data.works_month_label || '',
+                                data.works_prev || '',
+                                data.works_next || '',
+                                !!data.works_can_prev,
+                                !!data.works_can_next
+                            );
+
+                            const newParams = new URLSearchParams(window.location.search);
+                            newParams.set('works_month', data.works_month || month);
+                            history.pushState(null, '', '/timesheets?' + newParams.toString());
+                        })
+                        .catch(function (err) { console.error('AJAX-навигация по месяцам не удалась:', err); });
+                }
+
+                worksPagination.addEventListener('click', function (e) {
+                    const a = e.target.closest('a[data-ajax-month="works"]');
+                    if (!a) return;
+                    if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+                    e.preventDefault();
+                    const url = new URL(a.href, window.location.origin);
+                    const month = url.searchParams.get('works_month') || '';
+                    if (month) fetchWorksMonth(month);
+                });
+            }
+
+            window.addEventListener('popstate', function () {
+                window.location.reload();
+            });
+        })();
+    </script>
+</body>
+</html>

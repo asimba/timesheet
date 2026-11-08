@@ -1,0 +1,1542 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Главная</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="page-top">
+    <div class="config-box">
+        <h1>Система учёта рабочего времени</h1>
+        <p class="subtitle">
+            <span>Пользователь: <span class="username">{{.Username}}</span></span>
+            <a class="logout-icon-btn" href="/static/admin-guide.html" target="_blank" rel="noopener" title="Руководство администратора" aria-label="Руководство администратора">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M2 3h6a2 2 0 0 1 2 2v8a1.5 1.5 0 0 0-1.5-1.5H2z"/>
+                    <path d="M14 3H8a2 2 0 0 0-2 2v8a1.5 1.5 0 0 1 1.5-1.5H14z"/>
+                </svg>
+            </a>
+            <button type="button" class="logout-icon-btn" id="openLogoutModalBtn" title="Выйти" aria-label="Выйти">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M6 2H3.5A1.5 1.5 0 0 0 2 3.5v9A1.5 1.5 0 0 0 3.5 14H6"/>
+                    <path d="M10.5 11l3-3-3-3"/>
+                    <path d="M13.5 8H6"/>
+                </svg>
+            </button>
+        </p>
+        <div id="pageErrorMessage" hidden>{{.PageError}}</div>
+
+        <div class="tabs" role="tablist">
+            <button type="button" class="tab-btn active" role="tab" data-tab-target="groups" aria-selected="true">Группы и отделы</button>
+            <button type="button" class="tab-btn" role="tab" data-tab-target="employees" aria-selected="false">Сотрудники</button>
+            <button type="button" class="tab-btn" role="tab" data-tab-target="projects" aria-selected="false">Объекты и проекты</button>
+        </div>
+
+        <div class="tab-panel active" data-tab="groups" role="tabpanel">
+            <div class="actions">
+                <button type="button" class="btn" id="openGroupModalBtn">Добавить группу/отдел</button>
+            </div>
+            {{if .Groups}}
+            <table class="data-table" id="groups-table">
+                <thead>
+                    <tr>
+                        <th>№</th>
+                        <th>
+                            <a class="sort-toggle"
+                               href="/config?groups_dir={{if eq .GroupsDir "asc"}}desc{{else}}asc{{end}}&groups_page=1&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}"
+                               data-ajax-sort="groups"
+                               data-field="groups_dir"
+                               title="Сортировка по наименованию">
+                                Наименование {{if eq .GroupsDir "asc"}}↑{{else}}↓{{end}}
+                            </a>
+                        </th>
+                        <th class="actions-col">Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="groups-tbody">
+                    {{range $i, $g := .Groups}}
+                    <tr>
+                        <td class="id-col">{{globalIndex $.GroupsPage $i 10}}</td>
+                        <td>
+                            <a class="name-link" href="/config?employees_group_id={{$g.ID}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page=1">{{$g.Name}}</a>
+                            {{if $g.EmployeeCount}}<span class="group-count" title="Количество сотрудников в группе/отделе">({{$g.EmployeeCount}})</span>{{end}}
+                        </td>
+                        <td class="actions-col">
+                            <button type="button" class="icon-btn stats-btn" data-action="stats-group" data-id="{{$g.ID}}" data-name="{{$g.Name}}" title="Статистика по объектам" aria-label="Статистика по объектам">
+                                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M2 13V9M6 13V5M10 13V7M14 13V3"/>
+                                </svg>
+                            </button>
+                            <button type="button" class="icon-btn" data-action="stats-employees" data-id="{{$g.ID}}" data-name="{{$g.Name}}" title="Статистика по сотрудникам" aria-label="Статистика по сотрудникам">
+                                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M10 14v-2a4 4 0 0 0-4-4H4a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="6" cy="4" r="3"/>
+                                    <path d="M14 14v-2a4 4 0 0 0-3-3.87"/>
+                                    <path d="M12 4a3 3 0 0 1 0 5.5"/>
+                                </svg>
+                            </button>
+                            <button
+                                type="button"
+                                class="icon-btn"
+                                data-action="edit-group"
+                                data-id="{{$g.ID}}"
+                                data-name="{{$g.Name}}"
+                                title="Изменить" aria-label="Изменить">
+                                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/>
+                                </svg>
+                            </button>
+                            <form method="POST" action="/groups/delete?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}" class="inline-form"
+                                  onsubmit="return confirm('Удалить группу {{$g.Name}}?');">
+                                <input type="hidden" name="id" value="{{$g.ID}}">
+                                <button type="submit" class="icon-btn danger" title="Удалить" aria-label="Удалить">
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5L11 4M7 7v4M9 7v4"/>
+                                    </svg>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+            <div class="pagination" id="groups-pagination"
+                 data-page="{{.GroupsPage}}"
+                 data-total-pages="{{.GroupsTotalPages}}">
+                {{if gt .GroupsTotalPages 1}}
+                {{if gt .GroupsPage 1}}
+                <a class="page-link"
+                   data-ajax-page="groups"
+                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{sub .GroupsPage 1}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}">
+                    ← Назад
+                </a>
+                {{end}}
+                {{range $p := pagesRange .GroupsTotalPages}}
+                {{if eq $p $.GroupsPage}}
+                <span class="page-link current">{{$p}}</span>
+                {{else}}
+                <a class="page-link"
+                   data-ajax-page="groups"
+                   href="/config?groups_dir={{$.GroupsDir}}&groups_page={{$p}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}">
+                    {{$p}}
+                </a>
+                {{end}}
+                {{end}}
+                {{if lt .GroupsPage .GroupsTotalPages}}
+                <a class="page-link"
+                   data-ajax-page="groups"
+                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{add .GroupsPage 1}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}">
+                    Вперёд →
+                </a>
+                {{end}}
+                {{end}}
+            </div>
+            {{else}}
+            <div class="empty">Пока нет ни одной группы</div>
+            {{end}}
+        </div>
+
+        <div class="tab-panel" data-tab="employees" role="tabpanel">
+            <div class="actions">
+                <button type="button" class="btn" id="openEmployeeModalBtn">Добавить сотрудника</button>
+            </div>
+            {{if .EmployeesGroupID}}
+            <div class="hint-small">· фильтр по отделу · <a class="name-link" href="/config?employees_group_id=0&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page=1">сбросить</a></div>
+            {{end}}
+            {{if .Employees}}
+            <table class="data-table" id="employees-table">
+                <thead>
+                    <tr>
+                        <th>№</th>
+                        <th>
+                            <a class="sort-toggle"
+                               href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort=login&employees_dir={{if and (eq .EmployeesSort "login") (eq .EmployeesDir "asc")}}desc{{else}}asc{{end}}&employees_page=1&employees_group_id={{.EmployeesGroupID}}"
+                               data-ajax-sort="employees"
+                               title="Сортировка по логину">
+                                Логин {{if and (eq .EmployeesSort "login") (eq .EmployeesDir "asc")}}↑{{else if eq .EmployeesSort "login"}}↓{{end}}
+                            </a>
+                        </th>
+                        <th>
+                            <a class="sort-toggle"
+                               href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort=last_name&employees_dir={{if and (eq .EmployeesSort "last_name") (eq .EmployeesDir "asc")}}desc{{else}}asc{{end}}&employees_page=1&employees_group_id={{.EmployeesGroupID}}"
+                               data-ajax-sort="employees"
+                               title="Сортировка по фамилии">
+                                Фамилия {{if and (eq .EmployeesSort "last_name") (eq .EmployeesDir "asc")}}↑{{else if eq .EmployeesSort "last_name"}}↓{{end}}
+                            </a>
+                        </th>
+                        <th>Имя</th>
+                        <th>Отчество</th>
+                        <th>
+                            <a class="sort-toggle"
+                               href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort=group_name&employees_dir={{if and (eq .EmployeesSort "group_name") (eq .EmployeesDir "asc")}}desc{{else}}asc{{end}}&employees_page=1&employees_group_id={{.EmployeesGroupID}}"
+                               data-ajax-sort="employees"
+                               title="Сортировка по отделу">
+                                Отдел {{if and (eq .EmployeesSort "group_name") (eq .EmployeesDir "asc")}}↑{{else if eq .EmployeesSort "group_name"}}↓{{end}}
+                            </a>
+                        </th>
+                        <th class="actions-col-center">Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="employees-tbody">
+                    {{range $i, $e := .Employees}}
+                    <tr>
+                        <td class="id-col">{{globalIndex $.EmployeesPage $i 10}}</td>
+                        <td>{{$e.Login}}</td>
+                        <td><a class="name-link" href="/timesheets?employee_id={{$e.ID}}">{{$e.LastName}}</a></td>
+                        <td><a class="name-link" href="/timesheets?employee_id={{$e.ID}}">{{$e.FirstName}}</a></td>
+                        <td>
+                            {{if $e.MiddleName}}
+                            <a class="name-link" href="/timesheets?employee_id={{$e.ID}}">{{$e.MiddleName}}</a>
+                            {{else}}—{{end}}
+                        </td>
+                        <td>{{$e.GroupName}}</td>
+                        <td class="actions-col-center">
+                            <span class="timesheet-link" title="Количество записей в табеле">
+                                <span class="timesheet-count">({{$e.WorkEntriesCount}})</span>
+                                <a class="icon-btn" href="/timesheets?employee_id={{$e.ID}}" title="Табели" aria-label="Табели">
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <rect x="2" y="3" width="12" height="11" rx="1"/>
+                                        <path d="M2 6h12M5 2v2M11 2v2M5 9h2M9 9h2M5 12h2M9 12h2"/>
+                                    </svg>
+                                </a>
+                            </span>
+                            <button type="button" class="icon-btn" data-action="stats-individual-emp" data-id="{{$e.ID}}" data-name="{{$e.LastName}} {{$e.FirstName}}" title="Статистика" aria-label="Статистика">
+                                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M2 13V9M6 13V5M10 13V7M14 13V3"/>
+                                </svg>
+                            </button>
+                            <button
+                                type="button"
+                                class="icon-btn"
+                                data-action="edit"
+                                data-id="{{$e.ID}}"
+                                data-last-name="{{$e.LastName}}"
+                                data-first-name="{{$e.FirstName}}"
+                                data-middle-name="{{$e.MiddleName}}"
+                                data-group-id="{{$e.GroupID}}"
+                                title="Изменить" aria-label="Изменить">
+                                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/>
+                                </svg>
+                            </button>
+                            <form method="POST" action="/employees/delete?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}" class="inline-form"
+                                  onsubmit="return confirm('Удалить сотрудника {{$e.Login}}?');">
+                                <input type="hidden" name="id" value="{{$e.ID}}">
+                                <button type="submit" class="icon-btn danger" title="Удалить" aria-label="Удалить">
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5L11 4M7 7v4M9 7v4"/>
+                                    </svg>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+            <div class="pagination" id="employees-pagination"
+                 data-page="{{.EmployeesPage}}"
+                 data-total-pages="{{.EmployeesTotalPages}}">
+                {{if gt .EmployeesTotalPages 1}}
+                {{if gt .EmployeesPage 1}}
+                <a class="page-link"
+                   data-ajax-page="employees"
+                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{sub .EmployeesPage 1}}&employees_group_id={{.EmployeesGroupID}}">
+                    ← Назад
+                </a>
+                {{end}}
+                {{range $p := pagesRange .EmployeesTotalPages}}
+                {{if eq $p $.EmployeesPage}}
+                <span class="page-link current">{{$p}}</span>
+                {{else}}
+                <a class="page-link"
+                   data-ajax-page="employees"
+                   href="/config?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$p}}&employees_group_id={{$.EmployeesGroupID}}">
+                    {{$p}}
+                </a>
+                {{end}}
+                {{end}}
+                {{if lt .EmployeesPage .EmployeesTotalPages}}
+                <a class="page-link"
+                   data-ajax-page="employees"
+                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{add .EmployeesPage 1}}&employees_group_id={{.EmployeesGroupID}}">
+                    Вперёд →
+                </a>
+                {{end}}
+                {{end}}
+            </div>
+            {{else}}
+            <div class="empty">Пока нет ни одного сотрудника</div>
+            {{end}}
+        </div>
+
+        <div class="tab-panel" data-tab="projects" role="tabpanel">
+            <div class="actions">
+                <button type="button" class="btn" id="openProjectModalBtn">Добавить объект/проект</button>
+            </div>
+            {{if .Projects}}
+            <table class="data-table" id="projects-table">
+                <thead>
+                    <tr>
+                        <th>№</th>
+                        <th class="project-name-col">
+                            <a class="sort-toggle"
+                               href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort=name&projects_dir={{if and (eq .ProjectsSort "name") (eq .ProjectsDir "asc")}}desc{{else}}asc{{end}}&projects_page=1&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}"
+                               data-ajax-sort="projects"
+                               title="Сортировка по наименованию">
+                                Наименование {{if and (eq .ProjectsSort "name") (eq .ProjectsDir "asc")}}↑{{else if eq .ProjectsSort "name"}}↓{{end}}
+                            </a>
+                        </th>
+                        <th>
+                            <a class="sort-toggle"
+                               href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort=code&projects_dir={{if and (eq .ProjectsSort "code") (eq .ProjectsDir "asc")}}desc{{else}}asc{{end}}&projects_page=1&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}"
+                               data-ajax-sort="projects"
+                               title="Сортировка по коду">
+                                Кодовое обозначение {{if and (eq .ProjectsSort "code") (eq .ProjectsDir "asc")}}↑{{else if eq .ProjectsSort "code"}}↓{{end}}
+                            </a>
+                        </th>
+                        <th class="actions-col">Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="projects-tbody">
+                    {{range $i, $p := .Projects}}
+                    <tr>
+                        <td class="id-col">{{globalIndex $.ProjectsPage $i 10}}</td>
+                        <td class="project-name-col">{{$p.Name}}</td>
+                        <td>{{$p.Code}}</td>
+                        <td class="actions-col">
+                            <button
+                                type="button"
+                                class="icon-btn"
+                                data-action="edit-project"
+                                data-id="{{$p.ID}}"
+                                data-name="{{$p.Name}}"
+                                data-code="{{$p.Code}}"
+                                title="Изменить" aria-label="Изменить">
+                                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/>
+                                </svg>
+                            </button>
+                            <form method="POST" action="/projects/delete?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}" class="inline-form"
+                                  onsubmit="return confirm('Удалить проект {{$p.Code}}?');">
+                                <input type="hidden" name="id" value="{{$p.ID}}">
+                                <button type="submit" class="icon-btn danger" title="Удалить" aria-label="Удалить">
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5L11 4M7 7v4M9 7v4"/>
+                                    </svg>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+            <div class="pagination" id="projects-pagination"
+                 data-page="{{.ProjectsPage}}"
+                 data-total-pages="{{.ProjectsTotalPages}}">
+                {{if gt .ProjectsTotalPages 1}}
+                {{if gt .ProjectsPage 1}}
+                <a class="page-link"
+                   data-ajax-page="projects"
+                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{sub .ProjectsPage 1}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}">
+                    ← Назад
+                </a>
+                {{end}}
+                {{range $p := pagesRange .ProjectsTotalPages}}
+                {{if eq $p $.ProjectsPage}}
+                <span class="page-link current">{{$p}}</span>
+                {{else}}
+                <a class="page-link"
+                   data-ajax-page="projects"
+                   href="/config?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$p}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}">
+                    {{$p}}
+                </a>
+                {{end}}
+                {{end}}
+                {{if lt .ProjectsPage .ProjectsTotalPages}}
+                <a class="page-link"
+                   data-ajax-page="projects"
+                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{add .ProjectsPage 1}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}">
+                    Вперёд →
+                </a>
+                {{end}}
+                {{end}}
+            </div>
+            {{else}}
+            <div class="empty">Пока нет ни одного объекта/проекта</div>
+            {{end}}
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="groupModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
+            <h2 id="groupModalTitle">Добавить группу/отдел</h2>
+            <form method="POST" action="/groups?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}">
+                <div class="field">
+                    <label for="groupName">Наименование</label>
+                    <input type="text" id="groupName" name="name" required maxlength="200" autocomplete="off">
+                </div>
+                <div class="modal-error" id="groupModalError">{{.GroupError}}</div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" data-close="group">Отмена</button>
+                    <button type="submit" class="btn">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="modal-overlay" id="projectModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="projectModalTitle">
+            <h2 id="projectModalTitle">Добавить объект/проект</h2>
+            <form method="POST" action="/projects?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}">
+                <div class="field">
+                    <label for="projectName">Наименование</label>
+                    <input type="text" id="projectName" name="name" required maxlength="1024" autocomplete="off"
+                           value="{{.AddProjectName}}">
+                </div>
+                <div class="field">
+                    <label for="projectCode">Кодовое обозначение (шифр)</label>
+                    <input type="text" id="projectCode" name="code" required maxlength="20" autocomplete="off"
+                           value="{{.AddProjectCode}}">
+                </div>
+                <div class="modal-error" id="projectModalError">{{.ProjectError}}</div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" data-close="project">Отмена</button>
+                    <button type="submit" class="btn">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="modal-overlay" id="editProjectModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editProjectModalTitle">
+            <h2 id="editProjectModalTitle">Редактировать объект/проект</h2>
+            <form method="POST" action="/projects/edit?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}" id="editProjectForm">
+                <input type="hidden" name="id" id="editProjectId">
+                <div class="field">
+                    <label for="editProjectName">Наименование</label>
+                    <input type="text" id="editProjectName" name="name" required maxlength="1024" autocomplete="off">
+                </div>
+                <div class="field">
+                    <label for="editProjectCode">Кодовое обозначение (шифр)</label>
+                    <input type="text" id="editProjectCode" name="code" required maxlength="20" autocomplete="off">
+                </div>
+                <div class="modal-error" id="editProjectModalError">{{.EditProjectError}}</div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" data-close="edit-project">Отмена</button>
+                    <button type="submit" class="btn">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="modal-overlay" id="editGroupModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editGroupModalTitle">
+            <h2 id="editGroupModalTitle">Редактировать группу/отдел</h2>
+            <form method="POST" action="/groups/edit?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}" id="editGroupForm">
+                <input type="hidden" name="id" id="editGroupId">
+                <div class="field">
+                    <label for="editGroupName">Наименование</label>
+                    <input type="text" id="editGroupName" name="name" required maxlength="200" autocomplete="off">
+                </div>
+                <div class="modal-error" id="editGroupModalError">{{.EditGroupError}}</div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" data-close="edit-group">Отмена</button>
+                    <button type="submit" class="btn">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="modal-overlay" id="employeeModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="employeeModalTitle">
+            <h2 id="employeeModalTitle">Добавить сотрудника</h2>
+            {{if .AllGroups}}
+            <form method="POST" action="/employees?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}">
+                <div class="field">
+                    <label for="empLogin">Логин</label>
+                    <input type="text" id="empLogin" name="login" required maxlength="100" autocomplete="off"
+                           value="{{.AddLogin}}">
+                </div>
+                <div class="field">
+                    <label for="empPassword">Пароль</label>
+                    <div class="input-with-icon">
+                        <input type="text" id="empPassword" name="password" required minlength="4" maxlength="100" autocomplete="new-password">
+                        <button type="button" class="icon-btn" id="genPasswordBtn" title="Сгенерировать пароль" aria-label="Сгенерировать пароль">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M8 2v4M8 10v4M2 8h4M10 8h4M4 4l3 3M12 12l-3-3M4 12l3-3M12 4l-3 3"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="empLastName">Фамилия</label>
+                    <input type="text" id="empLastName" name="last_name" required maxlength="100" autocomplete="off"
+                           value="{{.AddLastName}}">
+                </div>
+                <div class="field">
+                    <label for="empFirstName">Имя</label>
+                    <input type="text" id="empFirstName" name="first_name" required maxlength="100" autocomplete="off"
+                           value="{{.AddFirstName}}">
+                </div>
+                <div class="field">
+                    <label for="empMiddleName">Отчество <span class="optional">(необязательно)</span></label>
+                    <input type="text" id="empMiddleName" name="middle_name" maxlength="100" autocomplete="off"
+                           value="{{.AddMiddleName}}">
+                </div>
+                <div class="field">
+                    <label for="empGroup">Отдел</label>
+                    <select id="empGroup" name="group_id" required>
+                        <option value="">— выберите отдел —</option>
+                        {{range .AllGroups}}
+                        <option value="{{.ID}}" {{if eq .ID $.AddGroupID}}selected{{end}}>{{.Name}}</option>
+                        {{end}}
+                    </select>
+                </div>
+                <div class="modal-error" id="employeeModalError">{{.EmployeeError}}</div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" data-close="employee">Отмена</button>
+                    <button type="submit" class="btn">Сохранить</button>
+                </div>
+            </form>
+            {{else}}
+            <div class="modal-message">
+                Сначала создайте хотя бы один отдел, чтобы можно было добавить сотрудника.
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" data-close="employee">Закрыть</button>
+            </div>
+            {{end}}
+        </div>
+    </div>
+    <div class="modal-overlay" id="editEmployeeModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editEmployeeModalTitle">
+            <h2 id="editEmployeeModalTitle">Редактировать учётную запись сотрудника</h2>
+            <form method="POST" action="/employees/edit?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}" id="editEmployeeForm">
+                <input type="hidden" name="id" id="editEmpId">
+                <div class="field">
+                    <label for="editEmpLastName">Фамилия</label>
+                    <input type="text" id="editEmpLastName" name="last_name" required maxlength="100" autocomplete="off">
+                </div>
+                <div class="field">
+                    <label for="editEmpFirstName">Имя</label>
+                    <input type="text" id="editEmpFirstName" name="first_name" required maxlength="100" autocomplete="off">
+                </div>
+                <div class="field">
+                    <label for="editEmpMiddleName">Отчество <span class="optional">(необязательно)</span></label>
+                    <input type="text" id="editEmpMiddleName" name="middle_name" maxlength="100" autocomplete="off">
+                </div>
+                <div class="field">
+                    <label for="editEmpGroup">Отдел</label>
+                    <select id="editEmpGroup" name="group_id" required>
+                        <option value="">— выберите отдел —</option>
+                        {{range .AllGroups}}
+                        <option value="{{.ID}}">{{.Name}}</option>
+                        {{end}}
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="editEmpPassword">Новый пароль <span class="optional">(оставьте пустым, чтобы не менять)</span></label>
+                    <div class="input-with-icon">
+                        <input type="text" id="editEmpPassword" name="password" minlength="4" maxlength="100" autocomplete="new-password">
+                        <button type="button" class="icon-btn" id="genEditPasswordBtn" title="Сгенерировать пароль" aria-label="Сгенерировать пароль">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M8 2v4M8 10v4M2 8h4M10 8h4M4 4l3 3M12 12l-3-3M4 12l3-3M12 4l-3 3"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-error" id="editEmployeeModalError">{{.EditError}}</div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" data-close="edit">Отмена</button>
+                    <button type="submit" class="btn">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="modal-overlay" id="groupStatsModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="groupStatsModalTitle">
+            <h2 id="groupStatsModalTitle">Экспорт статистики по объектам</h2>
+            <p class="hint-small">Выберите, что выгрузить:</p>
+            <div class="export-scope-wrapper">
+                <label class="export-radio-label">
+                    <input type="radio" name="group_stats_scope" value="month" checked class="export-radio-input">
+                    <span class="export-radio-text">Текущий месяц</span>
+                </label>
+                <label class="export-radio-label">
+                    <input type="radio" name="group_stats_scope" value="all" class="export-radio-input">
+                    <span class="export-radio-text">Все месяцы (каждый месяц — отдельная вкладка)</span>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" data-close="group-stats">Отмена</button>
+                <a class="btn" id="groupStatsConfirmBtn" href="#">Выгрузить</a>
+            </div>
+        </div>
+    </div>
+    <div class="modal-overlay" id="employeeStatsModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="employeeStatsModalTitle">
+            <h2 id="employeeStatsModalTitle">Экспорт статистики по сотрудникам</h2>
+            <p class="hint-small">Выберите, что выгрузить:</p>
+            <div class="export-scope-wrapper">
+                <label class="export-radio-label">
+                    <input type="radio" name="employee_stats_scope" value="month" checked class="export-radio-input">
+                    <span class="export-radio-text">Текущий месяц</span>
+                </label>
+                <label class="export-radio-label">
+                    <input type="radio" name="employee_stats_scope" value="all" class="export-radio-input">
+                    <span class="export-radio-text">Все месяцы (каждый месяц — отдельная вкладка)</span>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" data-close="employee-stats">Отмена</button>
+                <a class="btn" id="employeeStatsConfirmBtn" href="#">Выгрузить</a>
+            </div>
+        </div>
+    </div>
+    <div class="modal-overlay" id="individualEmpStatsModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="individualEmpStatsModalTitle">
+            <h2 id="individualEmpStatsModalTitle">Экспорт статистики сотрудника</h2>
+            <p class="hint-small">Выберите, что выгрузить:</p>
+            <div class="export-scope-wrapper">
+                <label class="export-radio-label">
+                    <input type="radio" name="individual_emp_stats_scope" value="month" checked class="export-radio-input">
+                    <span class="export-radio-text">Текущий месяц</span>
+                </label>
+                <label class="export-radio-label">
+                    <input type="radio" name="individual_emp_stats_scope" value="all" class="export-radio-input">
+                    <span class="export-radio-text">Все месяцы (каждый месяц — отдельная вкладка)</span>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" data-close="individual-emp-stats">Отмена</button>
+                <a class="btn" id="individualEmpStatsConfirmBtn" href="#">Выгрузить</a>
+            </div>
+        </div>
+    </div>
+    <div class="modal-overlay" id="logoutModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="logoutModalTitle">
+            <h2 id="logoutModalTitle">Выход из системы</h2>
+            <p class="modal-question">Вы действительно хотите выйти?</p>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" data-close="logout">Отмена</button>
+                <a class="btn" href="/logout">Выйти</a>
+            </div>
+        </div>
+    </div>
+    <div class="modal-overlay" id="messageModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="messageModalTitle">
+            <h2 id="messageModalTitle">Сообщение</h2>
+            <p class="modal-message" id="messageModalText"></p>
+            <div class="modal-actions">
+                <button type="button" class="btn" data-close="message">ОК</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const TABS = ['groups', 'employees', 'projects'];
+            const TAB_STORAGE_KEY = 'configActiveTab';
+            function activateTab(name) {
+                if (TABS.indexOf(name) === -1) name = 'groups';
+                document.querySelectorAll('.tab-btn').forEach(function (b) {
+                    const isActive = b.dataset.tabTarget === name;
+                    b.classList.toggle('active', isActive);
+                    b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                });
+                document.querySelectorAll('.tab-panel').forEach(function (p) {
+                    p.classList.toggle('active', p.dataset.tab === name);
+                });
+                try { localStorage.setItem(TAB_STORAGE_KEY, name); } catch (e) {}
+                if (history.replaceState) {
+                    history.replaceState(null, '', '#' + name);
+                }
+            }
+            document.querySelectorAll('.tab-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    activateTab(btn.dataset.tabTarget);
+                });
+            });
+            let initialTab = 'groups';
+            if (location.hash) {
+                const h = location.hash.replace('#', '');
+                if (TABS.indexOf(h) !== -1) initialTab = h;
+            } else {
+                try {
+                    const saved = localStorage.getItem(TAB_STORAGE_KEY);
+                    if (saved && TABS.indexOf(saved) !== -1) initialTab = saved;
+                } catch (e) {}
+            }
+            activateTab(initialTab);
+            window.addEventListener('hashchange', function () {
+                const h = location.hash.replace('#', '');
+                if (TABS.indexOf(h) !== -1) activateTab(h);
+            });
+
+            function setupModal(overlayId, openBtnId, errorId, tag) {
+                const overlay = document.getElementById(overlayId);
+                const openBtn = openBtnId ? document.getElementById(openBtnId) : null;
+                const errorEl = errorId ? document.getElementById(errorId) : null;
+                function openModal() {
+                    overlay.classList.add('open');
+                    const firstInput = overlay.querySelector('input:not([disabled]):not([type=hidden]), select, button, a.btn');
+                    if (firstInput) firstInput.focus();
+                }
+                function closeModal() {
+                    overlay.classList.remove('open');
+                    if (errorEl) errorEl.textContent = '';
+                }
+                if (openBtn) openBtn.addEventListener('click', openModal);
+                overlay.querySelectorAll('[data-close="' + tag + '"]').forEach(function (btn) {
+                    btn.addEventListener('click', closeModal);
+                });
+                overlay.addEventListener('click', function (e) {
+                    if (e.target === overlay) closeModal();
+                });
+                return { overlay: overlay, open: openModal, close: closeModal, errorEl: errorEl };
+            }
+            const groupModal = setupModal('groupModalOverlay', 'openGroupModalBtn', 'groupModalError', 'group');
+            const projectModal = setupModal('projectModalOverlay', 'openProjectModalBtn', 'projectModalError', 'project');
+            const editProjectModal = setupModal('editProjectModalOverlay', null, 'editProjectModalError', 'edit-project');
+            const editGroupModal = setupModal('editGroupModalOverlay', null, 'editGroupModalError', 'edit-group');
+            const employeeModal = setupModal('employeeModalOverlay', 'openEmployeeModalBtn', 'employeeModalError', 'employee');
+            const editModal = setupModal('editEmployeeModalOverlay', null, 'editEmployeeModalError', 'edit');
+            const groupStatsModal = setupModal('groupStatsModalOverlay', null, null, 'group-stats');
+            const employeeStatsModal = setupModal('employeeStatsModalOverlay', null, null, 'employee-stats');
+            const individualEmpStatsModal = setupModal('individualEmpStatsModalOverlay', null, null, 'individual-emp-stats');
+            const logoutModal = setupModal('logoutModalOverlay', 'openLogoutModalBtn', null, 'logout');
+            const messageModal = setupModal('messageModalOverlay', null, null, 'message');
+            const empLoginInput = document.getElementById('empLogin');
+            const empPasswordInput = document.getElementById('empPassword');
+            const openEmployeeBtn = document.getElementById('openEmployeeModalBtn');
+            if (openEmployeeBtn && empLoginInput) {
+                openEmployeeBtn.addEventListener('click', function() {
+                    if (empLoginInput.value.trim() === '') {
+                        fetch('/api/next-employee-id', {
+                            method: 'GET',
+                            headers: { 'Accept': 'application/json' },
+                            credentials: 'same-origin',
+                        })
+                            .then(function (resp) {
+                                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                                return resp.json();
+                            })
+                            .then(function (data) {
+                                if (empLoginInput.value.trim() !== '') return;
+                                const id = data && data.next_id ? data.next_id : 1;
+                                empLoginInput.value = 'user' + id;
+                            })
+                            .catch(function (err) {
+                                console.error('Не удалось получить следующий ID сотрудника:', err);
+                            });
+                    }
+                    if (empPasswordInput && empPasswordInput.value.trim() === '') {
+                        fetch('/api/generate-password?length=8', {
+                            method: 'GET',
+                            headers: { 'Accept': 'application/json' },
+                            credentials: 'same-origin',
+                        })
+                            .then(function (resp) {
+                                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                                return resp.json();
+                            })
+                            .then(function (data) {
+                                if (empPasswordInput.value.trim() !== '') return;
+                                empPasswordInput.value = String(data.password || '').slice(0, 8);
+                            })
+                            .catch(function (err) {
+                                console.error('Не удалось сгенерировать пароль:', err);
+                            });
+                    }
+                });
+            }
+            let currentStatsGroupId = null;
+            const groupStatsConfirmBtn = document.getElementById('groupStatsConfirmBtn');
+            let currentEmpStatsGroupId = null;
+            const employeeStatsConfirmBtn = document.getElementById('employeeStatsConfirmBtn');
+            let currentIndividualEmpId = null;
+            const individualEmpStatsConfirmBtn = document.getElementById('individualEmpStatsConfirmBtn');
+            function openGroupStatsModal(groupId, groupName) {
+                currentStatsGroupId = groupId;
+                document.getElementById('groupStatsModalTitle').textContent = 'Экспорт статистики по объектам: ' + groupName;
+                const monthRadio = document.querySelector('input[name="group_stats_scope"][value="month"]');
+                if (monthRadio) monthRadio.checked = true;
+                const now = new Date();
+                const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+                groupStatsConfirmBtn.href = '/groups/stats?group_id=' + encodeURIComponent(currentStatsGroupId) + '&scope=month&works_month=' + currentMonth;
+                groupStatsModal.open();
+            }
+            document.addEventListener('click', function (e) {
+                const btn = e.target.closest('button[data-action="stats-group"]');
+                if (btn) {
+                    e.preventDefault();
+                    openGroupStatsModal(btn.dataset.id, btn.dataset.name);
+                }
+            });
+            document.querySelectorAll('input[name="group_stats_scope"]').forEach(function(r) {
+                r.addEventListener('change', function() {
+                    if (currentStatsGroupId) {
+                        const scope = document.querySelector('input[name="group_stats_scope"]:checked').value;
+                        if (scope === 'month') {
+                            const now = new Date();
+                            const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+                            groupStatsConfirmBtn.href = '/groups/stats?group_id=' + encodeURIComponent(currentStatsGroupId) + '&scope=month&works_month=' + currentMonth;
+                        } else {
+                            groupStatsConfirmBtn.href = '/groups/stats?group_id=' + encodeURIComponent(currentStatsGroupId) + '&scope=all';
+                        }
+                    }
+                });
+            });
+            function openEmployeeStatsModal(groupId, groupName) {
+                currentEmpStatsGroupId = groupId;
+                document.getElementById('employeeStatsModalTitle').textContent = 'Экспорт статистики по сотрудникам: ' + groupName;
+                const monthRadio = document.querySelector('input[name="employee_stats_scope"][value="month"]');
+                if (monthRadio) monthRadio.checked = true;
+                const now = new Date();
+                const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+                employeeStatsConfirmBtn.href = '/employees/stats?group_id=' + encodeURIComponent(currentEmpStatsGroupId) + '&scope=month&works_month=' + currentMonth;
+                employeeStatsModal.open();
+            }
+            document.addEventListener('click', function (e) {
+                const btn = e.target.closest('button[data-action="stats-employees"]');
+                if (btn) {
+                    e.preventDefault();
+                    openEmployeeStatsModal(btn.dataset.id, btn.dataset.name);
+                }
+            });
+            document.querySelectorAll('input[name="employee_stats_scope"]').forEach(function(r) {
+                r.addEventListener('change', function() {
+                    if (currentEmpStatsGroupId) {
+                        const scope = document.querySelector('input[name="employee_stats_scope"]:checked').value;
+                        if (scope === 'month') {
+                            const now = new Date();
+                            const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+                            employeeStatsConfirmBtn.href = '/employees/stats?group_id=' + encodeURIComponent(currentEmpStatsGroupId) + '&scope=month&works_month=' + currentMonth;
+                        } else {
+                            employeeStatsConfirmBtn.href = '/employees/stats?group_id=' + encodeURIComponent(currentEmpStatsGroupId) + '&scope=all';
+                        }
+                    }
+                });
+            });
+            function openIndividualEmpStatsModal(empId, empName) {
+                currentIndividualEmpId = empId;
+                document.getElementById('individualEmpStatsModalTitle').textContent = 'Экспорт статистики сотрудника: ' + empName;
+                const monthRadio = document.querySelector('input[name="individual_emp_stats_scope"][value="month"]');
+                if (monthRadio) monthRadio.checked = true;
+                const now = new Date();
+                const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+                individualEmpStatsConfirmBtn.href = '/employees/stats/individual?employee_id=' + encodeURIComponent(currentIndividualEmpId) + '&scope=month&works_month=' + currentMonth;
+                individualEmpStatsModal.open();
+            }
+            document.addEventListener('click', function (e) {
+                const btn = e.target.closest('button[data-action="stats-individual-emp"]');
+                if (btn) {
+                    e.preventDefault();
+                    openIndividualEmpStatsModal(btn.dataset.id, btn.dataset.name);
+                }
+            });
+            document.querySelectorAll('input[name="individual_emp_stats_scope"]').forEach(function(r) {
+                r.addEventListener('change', function() {
+                    if (currentIndividualEmpId) {
+                        const scope = document.querySelector('input[name="individual_emp_stats_scope"]:checked').value;
+                        if (scope === 'month') {
+                            const now = new Date();
+                            const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+                            individualEmpStatsConfirmBtn.href = '/employees/stats/individual?employee_id=' + encodeURIComponent(currentIndividualEmpId) + '&scope=month&works_month=' + currentMonth;
+                        } else {
+                            individualEmpStatsConfirmBtn.href = '/employees/stats/individual?employee_id=' + encodeURIComponent(currentIndividualEmpId) + '&scope=all';
+                        }
+                    }
+                });
+            });
+            document.querySelectorAll('button[data-action="edit-group"]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    document.getElementById('editGroupId').value = btn.dataset.id;
+                    document.getElementById('editGroupName').value = btn.dataset.name;
+                    editGroupModal.errorEl.textContent = '';
+                    editGroupModal.open();
+                });
+            });
+            document.querySelectorAll('button[data-action="edit-project"]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    document.getElementById('editProjectId').value = btn.dataset.id;
+                    document.getElementById('editProjectName').value = btn.dataset.name;
+                    document.getElementById('editProjectCode').value = btn.dataset.code;
+                    editProjectModal.errorEl.textContent = '';
+                    editProjectModal.open();
+                });
+            });
+            document.querySelectorAll('button[data-action="edit"]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const d = btn.dataset;
+                    document.getElementById('editEmpId').value = d.id;
+                    document.getElementById('editEmpLastName').value = d.lastName;
+                    document.getElementById('editEmpFirstName').value = d.firstName;
+                    document.getElementById('editEmpMiddleName').value = d.middleName;
+                    document.getElementById('editEmpGroup').value = d.groupId;
+                    document.getElementById('editEmpPassword').value = '';
+                    editModal.errorEl.textContent = '';
+                    editModal.open();
+                });
+            });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') {
+                    [groupModal, projectModal, editProjectModal, editGroupModal, employeeModal, editModal, groupStatsModal, employeeStatsModal, individualEmpStatsModal, logoutModal, messageModal].forEach(function (m) {
+                        if (m.overlay.classList.contains('open')) m.overlay.classList.remove('open');
+                    });
+                }
+            });
+            if (groupModal.errorEl && groupModal.errorEl.textContent.trim() !== '') {
+                activateTab('groups');
+                groupModal.open();
+            }
+            if (projectModal.errorEl && projectModal.errorEl.textContent.trim() !== '') {
+                activateTab('projects');
+                projectModal.open();
+            }
+            if (employeeModal.errorEl && employeeModal.errorEl.textContent.trim() !== '') {
+                activateTab('employees');
+                employeeModal.open();
+            }
+            const pageErrorMessageEl = document.getElementById('pageErrorMessage');
+            if (pageErrorMessageEl) {
+                const text = pageErrorMessageEl.textContent.trim();
+                if (text !== '') {
+                    document.getElementById('messageModalText').textContent = text;
+                    messageModal.open();
+                }
+            }
+            {{if .EditEmployee}}
+            (function () {
+                const e = {
+                    id: "{{.EditEmployee.ID}}",
+                    lastName: "{{.EditEmployee.LastName}}",
+                    firstName: "{{.EditEmployee.FirstName}}",
+                    middleName: "{{.EditEmployee.MiddleName}}",
+                    groupId: "{{.EditEmployee.GroupID}}",
+                };
+                document.getElementById('editEmpId').value = e.id;
+                document.getElementById('editEmpLastName').value = e.lastName;
+                document.getElementById('editEmpFirstName').value = e.firstName;
+                document.getElementById('editEmpMiddleName').value = e.middleName;
+                document.getElementById('editEmpGroup').value = e.groupId;
+                document.getElementById('editEmpPassword').value = '';
+                activateTab('employees');
+                editModal.open();
+            })();
+            {{end}}
+            {{if .EditGroup}}
+            (function () {
+                document.getElementById('editGroupId').value = "{{.EditGroup.ID}}";
+                document.getElementById('editGroupName').value = "{{.EditGroup.Name}}";
+                activateTab('groups');
+                editGroupModal.open();
+            })();
+            {{end}}
+            {{if .EditProject}}
+            (function () {
+                document.getElementById('editProjectId').value = "{{.EditProject.ID}}";
+                document.getElementById('editProjectName').value = "{{.EditProject.Name}}";
+                document.getElementById('editProjectCode').value = "{{.EditProject.Code}}";
+                activateTab('projects');
+                editProjectModal.open();
+            })();
+            {{end}}
+            const groupsTable = document.getElementById('groups-table');
+            const groupsPagination = document.getElementById('groups-pagination');
+            if (groupsTable) {
+                const groupsTbody = document.getElementById('groups-tbody');
+                const GROUPS_PER_PAGE = 10;
+                function buildGroupRow(g, idx, page) {
+                    const tr = document.createElement('tr');
+                    const tdId = document.createElement('td');
+                    tdId.className = 'id-col';
+                    tdId.textContent = String((page - 1) * GROUPS_PER_PAGE + idx + 1);
+                    tr.appendChild(tdId);
+                    const tdName = document.createElement('td');
+                    const aName = document.createElement('a');
+                    aName.className = 'name-link';
+                    const p = new URLSearchParams();
+                    p.set('employees_group_id', String(g.id));
+                    p.set('employees_sort', '{{.EmployeesSort}}');
+                    p.set('employees_dir', '{{.EmployeesDir}}');
+                    p.set('employees_page', '1');
+                    aName.href = '/config?' + p.toString();
+                    aName.textContent = g.name;
+                    tdName.appendChild(aName);
+                    if (g.employee_count) {
+                        const cnt = document.createElement('span');
+                        cnt.className = 'group-count';
+                        cnt.title = 'Количество сотрудников в группе/отделе';
+                        cnt.textContent = ' (' + g.employee_count + ')';
+                        tdName.appendChild(cnt);
+                    }
+                    tr.appendChild(tdName);
+                    const tdActions = document.createElement('td');
+                    tdActions.className = 'actions-col';
+                    const statsBtn = document.createElement('button');
+                    statsBtn.type = 'button';
+                    statsBtn.className = 'icon-btn stats-btn';
+                    statsBtn.dataset.action = 'stats-group';
+                    statsBtn.dataset.id = String(g.id);
+                    statsBtn.dataset.name = g.name;
+                    statsBtn.title = 'Статистика по объектам';
+                    statsBtn.setAttribute('aria-label', 'Статистика по объектам');
+                    statsBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 13V9M6 13V5M10 13V7M14 13V3"/></svg>';
+                    tdActions.appendChild(statsBtn);
+                    const empStatsBtn = document.createElement('button');
+                    empStatsBtn.type = 'button';
+                    empStatsBtn.className = 'icon-btn';
+                    empStatsBtn.dataset.action = 'stats-employees';
+                    empStatsBtn.dataset.id = String(g.id);
+                    empStatsBtn.dataset.name = g.name;
+                    empStatsBtn.title = 'Статистика по сотрудникам';
+                    empStatsBtn.setAttribute('aria-label', 'Статистика по сотрудникам');
+                    empStatsBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14v-2a4 4 0 0 0-4-4H4a4 4 0 0 0-4 4v2"/><circle cx="6" cy="4" r="3"/><path d="M14 14v-2a4 4 0 0 0-3-3.87"/><path d="M12 4a3 3 0 0 1 0 5.5"/></svg>';
+                    tdActions.appendChild(empStatsBtn);
+                    const editBtn = document.createElement('button');
+                    editBtn.type = 'button';
+                    editBtn.className = 'icon-btn';
+                    editBtn.title = 'Изменить';
+                    editBtn.setAttribute('aria-label', 'Изменить');
+                    editBtn.dataset.action = 'edit-group';
+                    editBtn.dataset.id = String(g.id);
+                    editBtn.dataset.name = g.name;
+                    editBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/></svg>';
+                    editBtn.addEventListener('click', function () {
+                        document.getElementById('editGroupId').value = editBtn.dataset.id;
+                        document.getElementById('editGroupName').value = editBtn.dataset.name;
+                        editGroupModal.errorEl.textContent = '';
+                        editGroupModal.open();
+                    });
+                    tdActions.appendChild(editBtn);
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.className = 'inline-form';
+                    form.action = '/groups/delete' + window.location.search;
+                    form.onsubmit = function () { return confirm('Удалить группу ' + g.name + '?'); };
+                    const hidden = document.createElement('input');
+                    hidden.type = 'hidden';
+                    hidden.name = 'id';
+                    hidden.value = String(g.id);
+                    form.appendChild(hidden);
+                    const delBtn = document.createElement('button');
+                    delBtn.type = 'submit';
+                    delBtn.className = 'icon-btn danger';
+                    delBtn.title = 'Удалить';
+                    delBtn.setAttribute('aria-label', 'Удалить');
+                    delBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5L11 4M7 7v4M9 7v4"/></svg>';
+                    form.appendChild(delBtn);
+                    tdActions.appendChild(form);
+                    tr.appendChild(tdActions);
+                    return tr;
+                }
+                function renderGroups(groups, page) {
+                    if (!groupsTbody) return;
+                    const rows = groups.map(function (g, idx) { return buildGroupRow(g, idx, page); });
+                    groupsTbody.replaceChildren.apply(groupsTbody, rows);
+                }
+                function renderGroupsHeader(groupsDir) {
+                    const link = groupsTable.querySelector('a[data-ajax-sort="groups"]');
+                    if (!link) return;
+                    const nextDir = groupsDir === 'asc' ? 'desc' : 'asc';
+                    const url = new URL(link.href, window.location.origin);
+                    url.searchParams.set('groups_dir', nextDir);
+                    url.searchParams.set('groups_page', '1');
+                    link.href = url.pathname + url.search;
+                    link.textContent = 'Наименование ' + (groupsDir === 'asc' ? '↑' : '↓');
+                }
+                function renderGroupsPagination(page, totalPages) {
+                    if (!groupsPagination) return;
+                    groupsPagination.replaceChildren();
+                    groupsPagination.dataset.page = String(page);
+                    groupsPagination.dataset.totalPages = String(totalPages);
+                    if (totalPages <= 1) return;
+                    function makeLink(text, pageNum, active) {
+                        const el = document.createElement(active ? 'span' : 'a');
+                        el.className = 'page-link' + (active ? ' current' : '');
+                        el.textContent = text;
+                        if (!active) {
+                            el.dataset.ajaxPage = 'groups';
+                            const params = new URLSearchParams(window.location.search);
+                            params.set('groups_page', String(pageNum));
+                            el.href = '/config?' + params.toString();
+                        }
+                        return el;
+                    }
+                    if (page > 1) groupsPagination.appendChild(makeLink('← Назад', page - 1, false));
+                    for (let i = 1; i <= totalPages; i++) {
+                        groupsPagination.appendChild(makeLink(String(i), i, i === page));
+                    }
+                    if (page < totalPages) groupsPagination.appendChild(makeLink('Вперёд →', page + 1, false));
+                }
+                function fetchGroupsPage(pageNum) {
+                    const params = new URLSearchParams(window.location.search);
+                    params.set('groups_page', String(pageNum));
+                    params.set('partial', 'groups');
+                    fetch('/config?' + params.toString(), {
+                        method: 'GET', headers: { 'Accept': 'application/json' }, credentials: 'same-origin',
+                    })
+                        .then(function (resp) {
+                            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                            return resp.json();
+                        })
+                        .then(function (data) {
+                            const page = data.groups_page || 1;
+                            renderGroups(data.groups || [], page);
+                            renderGroupsHeader(data.groups_dir || 'asc');
+                            renderGroupsPagination(page, data.groups_total_pages || 0);
+                            const newParams = new URLSearchParams(window.location.search);
+                            newParams.set('groups_page', String(page));
+                            history.pushState(null, '', '/config?' + newParams.toString());
+                        })
+                        .catch(function (err) { console.error('AJAX-пагинация групп не удалась:', err); });
+                }
+                document.getElementById('genPasswordBtn').addEventListener('click', function() {
+                    fetch('/api/generate-password?length=8')
+                        .then(response => {
+                            if (!response.ok) throw new Error('Ошибка сети');
+                            return response.json();
+                        })
+                        .then(data => {
+                            document.getElementById('empPassword').value = String(data.password || '').slice(0, 8);
+                        })
+                        .catch(err => {
+                            console.error('Не удалось сгенерировать пароль:', err);
+                            alert('Не удалось сгенерировать пароль. Попробуйте позже.');
+                        });
+                })
+                document.getElementById('genEditPasswordBtn').addEventListener('click', function() {
+                    fetch('/api/generate-password?length=8')
+                        .then(response => {
+                            if (!response.ok) throw new Error('Ошибка сети');
+                            return response.json();
+                        })
+                        .then(data => {
+                            document.getElementById('editEmpPassword').value = String(data.password || '').slice(0, 8);
+                        })
+                        .catch(err => {
+                            console.error('Не удалось сгенерировать пароль:', err);
+                            alert('Не удалось сгенерировать пароль. Попробуйте позже.');
+                        });
+                })
+                groupsTable.querySelectorAll('a[data-ajax-sort="groups"]').forEach(function (link) {
+                    link.addEventListener('click', function (e) {
+                        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+                        e.preventDefault();
+                        const targetUrl = new URL(link.href, window.location.origin);
+                        const partialUrl = new URL(targetUrl.toString());
+                        partialUrl.searchParams.set('partial', 'groups');
+                        fetch(partialUrl.toString(), {
+                            method: 'GET', headers: { 'Accept': 'application/json' }, credentials: 'same-origin',
+                        })
+                            .then(function (resp) {
+                                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                                return resp.json();
+                            })
+                            .then(function (data) {
+                                const page = data.groups_page || 1;
+                                renderGroups(data.groups || [], page);
+                                renderGroupsHeader(data.groups_dir || 'asc');
+                                renderGroupsPagination(page, data.groups_total_pages || 0);
+                                history.pushState(null, '', targetUrl.pathname + targetUrl.search);
+                            })
+                            .catch(function (err) { console.error('AJAX-сортировка групп не удалась:', err); });
+                    });
+                });
+                if (groupsPagination) {
+                    groupsPagination.addEventListener('click', function (e) {
+                        const a = e.target.closest('a[data-ajax-page="groups"]');
+                        if (!a) return;
+                        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+                        e.preventDefault();
+                        const url = new URL(a.href, window.location.origin);
+                        const pageNum = parseInt(url.searchParams.get('groups_page') || '1', 10) || 1;
+                        fetchGroupsPage(pageNum);
+                    });
+                }
+            }
+            const employeesTable = document.getElementById('employees-table');
+            const employeesPagination = document.getElementById('employees-pagination');
+            if (employeesTable) {
+                const employeesTbody = document.getElementById('employees-tbody');
+                const EMPLOYEES_PER_PAGE = 10;
+                function buildEmployeeRow(e, idx, page) {
+                    const tr = document.createElement('tr');
+                    const tdId = document.createElement('td');
+                    tdId.className = 'id-col';
+                    tdId.textContent = String((page - 1) * EMPLOYEES_PER_PAGE + idx + 1);
+                    tr.appendChild(tdId);
+                    const tdLogin = document.createElement('td');
+                    tdLogin.textContent = e.login;
+                    tr.appendChild(tdLogin);
+                    const tdLast = document.createElement('td');
+                    const aLast = document.createElement('a');
+                    aLast.className = 'name-link';
+                    aLast.href = '/timesheets?employee_id=' + encodeURIComponent(e.id);
+                    aLast.textContent = e.last_name;
+                    tdLast.appendChild(aLast);
+                    tr.appendChild(tdLast);
+                    const tdFirst = document.createElement('td');
+                    const aFirst = document.createElement('a');
+                    aFirst.className = 'name-link';
+                    aFirst.href = '/timesheets?employee_id=' + encodeURIComponent(e.id);
+                    aFirst.textContent = e.first_name;
+                    tdFirst.appendChild(aFirst);
+                    tr.appendChild(tdFirst);
+                    const tdMiddle = document.createElement('td');
+                    if (e.middle_name) {
+                        const aMiddle = document.createElement('a');
+                        aMiddle.className = 'name-link';
+                        aMiddle.href = '/timesheets?employee_id=' + encodeURIComponent(e.id);
+                        aMiddle.textContent = e.middle_name;
+                        tdMiddle.appendChild(aMiddle);
+                    } else {
+                        tdMiddle.textContent = '—';
+                    }
+                    tr.appendChild(tdMiddle);
+                    const tdGroup = document.createElement('td');
+                    tdGroup.textContent = e.group_name;
+                    tr.appendChild(tdGroup);
+                    const tdActions = document.createElement('td');
+                    tdActions.className = 'actions-col-center';
+                    const tsWrap = document.createElement('span');
+                    tsWrap.className = 'timesheet-link';
+                    tsWrap.title = 'Количество записей в табеле';
+                    const cntSpan = document.createElement('span');
+                    cntSpan.className = 'timesheet-count';
+                    cntSpan.textContent = '(' + (e.work_entries_count || 0) + ')';
+                    tsWrap.appendChild(cntSpan);
+                    const tabBtn = document.createElement('a');
+                    tabBtn.className = 'icon-btn';
+                    tabBtn.href = '/timesheets?employee_id=' + encodeURIComponent(e.id);
+                    tabBtn.title = 'Табели';
+                    tabBtn.setAttribute('aria-label', 'Табели');
+                    tabBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="1"/><path d="M2 6h12M5 2v2M11 2v2M5 9h2M9 9h2M5 12h2M9 12h2"/></svg>';
+                    tsWrap.appendChild(tabBtn);
+                    tdActions.appendChild(tsWrap);
+                    const indStatsBtn = document.createElement('button');
+                    indStatsBtn.type = 'button';
+                    indStatsBtn.className = 'icon-btn';
+                    indStatsBtn.dataset.action = 'stats-individual-emp';
+                    indStatsBtn.dataset.id = String(e.id);
+                    indStatsBtn.dataset.name = e.last_name + ' ' + e.first_name;
+                    indStatsBtn.title = 'Статистика';
+                    indStatsBtn.setAttribute('aria-label', 'Статистика');
+                    indStatsBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 13V9M6 13V5M10 13V7M14 13V3"/></svg>';
+                    tdActions.appendChild(indStatsBtn);
+                    const editBtn = document.createElement('button');
+                    editBtn.type = 'button';
+                    editBtn.className = 'icon-btn';
+                    editBtn.title = 'Изменить';
+                    editBtn.setAttribute('aria-label', 'Изменить');
+                    editBtn.dataset.action = 'edit';
+                    editBtn.dataset.id = String(e.id);
+                    editBtn.dataset.lastName = e.last_name;
+                    editBtn.dataset.firstName = e.first_name;
+                    editBtn.dataset.middleName = e.middle_name;
+                    editBtn.dataset.groupId = String(e.group_id);
+                    editBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/></svg>';
+                    editBtn.addEventListener('click', function () {
+                        document.getElementById('editEmpId').value = editBtn.dataset.id;
+                        document.getElementById('editEmpLastName').value = editBtn.dataset.lastName;
+                        document.getElementById('editEmpFirstName').value = editBtn.dataset.firstName;
+                        document.getElementById('editEmpMiddleName').value = editBtn.dataset.middleName;
+                        document.getElementById('editEmpGroup').value = editBtn.dataset.groupId;
+                        document.getElementById('editEmpPassword').value = '';
+                        editModal.errorEl.textContent = '';
+                        editModal.open();
+                    });
+                    tdActions.appendChild(editBtn);
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.className = 'inline-form';
+                    form.action = '/employees/delete' + window.location.search;
+                    form.onsubmit = function () { return confirm('Удалить сотрудника ' + e.login + '?'); };
+                    const hidden = document.createElement('input');
+                    hidden.type = 'hidden';
+                    hidden.name = 'id';
+                    hidden.value = String(e.id);
+                    form.appendChild(hidden);
+                    const delBtn = document.createElement('button');
+                    delBtn.type = 'submit';
+                    delBtn.className = 'icon-btn danger';
+                    delBtn.title = 'Удалить';
+                    delBtn.setAttribute('aria-label', 'Удалить');
+                    delBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5L11 4M7 7v4M9 7v4"/></svg>';
+                    form.appendChild(delBtn);
+                    tdActions.appendChild(form);
+                    tr.appendChild(tdActions);
+                    return tr;
+                }
+                function renderEmployees(employees, page) {
+                    if (!employeesTbody) return;
+                    const rows = employees.map(function (e, idx) { return buildEmployeeRow(e, idx, page); });
+                    employeesTbody.replaceChildren.apply(employeesTbody, rows);
+                }
+                function renderEmployeesHeader(employeesSort, employeesDir) {
+                    const links = employeesTable.querySelectorAll('a[data-ajax-sort="employees"]');
+                    links.forEach(function (link) {
+                        const url = new URL(link.href, window.location.origin);
+                        const field = url.searchParams.get('employees_sort');
+                        const isActive = field === employeesSort;
+                        const nextDir = isActive && employeesDir === 'asc' ? 'desc' : 'asc';
+                        url.searchParams.set('employees_sort', field);
+                        url.searchParams.set('employees_dir', nextDir);
+                        url.searchParams.set('employees_page', '1');
+                        link.href = url.pathname + url.search;
+                        const arrow = isActive ? (employeesDir === 'asc' ? ' ↑' : ' ↓') : '';
+                        let baseText = 'Логин';
+                        if (field === 'last_name') baseText = 'Фамилия';
+                        else if (field === 'group_name') baseText = 'Отдел';
+                        link.textContent = baseText + arrow;
+                    });
+                }
+                function renderEmployeesPagination(page, totalPages) {
+                    if (!employeesPagination) return;
+                    employeesPagination.replaceChildren();
+                    employeesPagination.dataset.page = String(page);
+                    employeesPagination.dataset.totalPages = String(totalPages);
+                    if (totalPages <= 1) return;
+                    function makeLink(text, pageNum, active) {
+                        const el = document.createElement(active ? 'span' : 'a');
+                        el.className = 'page-link' + (active ? ' current' : '');
+                        el.textContent = text;
+                        if (!active) {
+                            el.dataset.ajaxPage = 'employees';
+                            const params = new URLSearchParams(window.location.search);
+                            params.set('employees_page', String(pageNum));
+                            el.href = '/config?' + params.toString();
+                        }
+                        return el;
+                    }
+                    if (page > 1) employeesPagination.appendChild(makeLink('← Назад', page - 1, false));
+                    for (let i = 1; i <= totalPages; i++) {
+                        employeesPagination.appendChild(makeLink(String(i), i, i === page));
+                    }
+                    if (page < totalPages) employeesPagination.appendChild(makeLink('Вперёд →', page + 1, false));
+                }
+                function fetchEmployeesPage(pageNum) {
+                    const params = new URLSearchParams(window.location.search);
+                    params.set('employees_page', String(pageNum));
+                    params.set('partial', 'employees');
+                    fetch('/config?' + params.toString(), {
+                        method: 'GET', headers: { 'Accept': 'application/json' }, credentials: 'same-origin',
+                    })
+                        .then(function (resp) {
+                            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                            return resp.json();
+                        })
+                        .then(function (data) {
+                            const page = data.employees_page || 1;
+                            renderEmployees(data.employees || [], page);
+                            renderEmployeesHeader(data.employees_sort || 'login', data.employees_dir || 'asc');
+                            renderEmployeesPagination(page, data.employees_total_pages || 0);
+                            const newParams = new URLSearchParams(window.location.search);
+                            newParams.set('employees_page', String(page));
+                            history.pushState(null, '', '/config?' + newParams.toString());
+                        })
+                        .catch(function (err) { console.error('AJAX-пагинация сотрудников не удалась:', err); });
+                }
+                employeesTable.querySelectorAll('a[data-ajax-sort="employees"]').forEach(function (link) {
+                    link.addEventListener('click', function (e) {
+                        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+                        e.preventDefault();
+                        const targetUrl = new URL(link.href, window.location.origin);
+                        const partialUrl = new URL(targetUrl.toString());
+                        partialUrl.searchParams.set('partial', 'employees');
+                        fetch(partialUrl.toString(), {
+                            method: 'GET', headers: { 'Accept': 'application/json' }, credentials: 'same-origin',
+                        })
+                            .then(function (resp) {
+                                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                                return resp.json();
+                            })
+                            .then(function (data) {
+                                const page = data.employees_page || 1;
+                                renderEmployees(data.employees || [], page);
+                                renderEmployeesHeader(data.employees_sort || 'login', data.employees_dir || 'asc');
+                                renderEmployeesPagination(page, data.employees_total_pages || 0);
+                                history.pushState(null, '', targetUrl.pathname + targetUrl.search);
+                            })
+                            .catch(function (err) { console.error('AJAX-сортировка сотрудников не удалась:', err); });
+                    });
+                });
+                if (employeesPagination) {
+                    employeesPagination.addEventListener('click', function (e) {
+                        const a = e.target.closest('a[data-ajax-page="employees"]');
+                        if (!a) return;
+                        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+                        e.preventDefault();
+                        const url = new URL(a.href, window.location.origin);
+                        const pageNum = parseInt(url.searchParams.get('employees_page') || '1', 10) || 1;
+                        fetchEmployeesPage(pageNum);
+                    });
+                }
+            }
+            const projectsTable = document.getElementById('projects-table');
+            const projectsPagination = document.getElementById('projects-pagination');
+            if (projectsTable) {
+                const projectsTbody = document.getElementById('projects-tbody');
+                const PROJECTS_PER_PAGE = 10;
+                function buildProjectRow(p, idx, page) {
+                    const tr = document.createElement('tr');
+                    const tdId = document.createElement('td');
+                    tdId.className = 'id-col';
+                    tdId.textContent = String((page - 1) * PROJECTS_PER_PAGE + idx + 1);
+                    tr.appendChild(tdId);
+                    const tdName = document.createElement('td');
+                    tdName.className = 'project-name-col';
+                    tdName.textContent = p.name;
+                    tr.appendChild(tdName);
+                    const tdCode = document.createElement('td');
+                    tdCode.textContent = p.code;
+                    tr.appendChild(tdCode);
+                    const tdActions = document.createElement('td');
+                    tdActions.className = 'actions-col';
+                    const editBtn = document.createElement('button');
+                    editBtn.type = 'button';
+                    editBtn.className = 'icon-btn';
+                    editBtn.title = 'Изменить';
+                    editBtn.setAttribute('aria-label', 'Изменить');
+                    editBtn.dataset.action = 'edit-project';
+                    editBtn.dataset.id = String(p.id);
+                    editBtn.dataset.name = p.name;
+                    editBtn.dataset.code = p.code;
+                    editBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/></svg>';
+                    editBtn.addEventListener('click', function () {
+                        document.getElementById('editProjectId').value = editBtn.dataset.id;
+                        document.getElementById('editProjectName').value = editBtn.dataset.name;
+                        document.getElementById('editProjectCode').value = editBtn.dataset.code;
+                        editProjectModal.errorEl.textContent = '';
+                        editProjectModal.open();
+                    });
+                    tdActions.appendChild(editBtn);
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.className = 'inline-form';
+                    form.action = '/projects/delete' + window.location.search;
+                    form.onsubmit = function () { return confirm('Удалить проект ' + p.code + '?'); };
+                    const hidden = document.createElement('input');
+                    hidden.type = 'hidden';
+                    hidden.name = 'id';
+                    hidden.value = String(p.id);
+                    form.appendChild(hidden);
+                    const delBtn = document.createElement('button');
+                    delBtn.type = 'submit';
+                    delBtn.className = 'icon-btn danger';
+                    delBtn.title = 'Удалить';
+                    delBtn.setAttribute('aria-label', 'Удалить');
+                    delBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5L11 4M7 7v4M9 7v4"/></svg>';
+                    form.appendChild(delBtn);
+                    tdActions.appendChild(form);
+                    tr.appendChild(tdActions);
+                    return tr;
+                }
+                function renderProjects(projects, page) {
+                    if (!projectsTbody) return;
+                    const rows = projects.map(function (p, idx) { return buildProjectRow(p, idx, page); });
+                    projectsTbody.replaceChildren.apply(projectsTbody, rows);
+                }
+                function renderProjectsHeader(projectsSort, projectsDir) {
+                    const links = projectsTable.querySelectorAll('a[data-ajax-sort="projects"]');
+                    links.forEach(function (link) {
+                        const url = new URL(link.href, window.location.origin);
+                        const field = url.searchParams.get('projects_sort');
+                        const isActive = field === projectsSort;
+                        const nextDir = isActive && projectsDir === 'asc' ? 'desc' : 'asc';
+                        url.searchParams.set('projects_sort', field);
+                        url.searchParams.set('projects_dir', nextDir);
+                        url.searchParams.set('projects_page', '1');
+                        link.href = url.pathname + url.search;
+                        const arrow = isActive ? (projectsDir === 'asc' ? ' ↑' : ' ↓') : '';
+                        const baseText = field === 'code' ? 'Кодовое обозначение' : 'Наименование';
+                        link.textContent = baseText + arrow;
+                    });
+                }
+                function renderProjectsPagination(page, totalPages) {
+                    if (!projectsPagination) return;
+                    projectsPagination.replaceChildren();
+                    projectsPagination.dataset.page = String(page);
+                    projectsPagination.dataset.totalPages = String(totalPages);
+                    if (totalPages <= 1) return;
+                    function makeLink(text, pageNum, active) {
+                        const el = document.createElement(active ? 'span' : 'a');
+                        el.className = 'page-link' + (active ? ' current' : '');
+                        el.textContent = text;
+                        if (!active) {
+                            el.dataset.ajaxPage = 'projects';
+                            const params = new URLSearchParams(window.location.search);
+                            params.set('projects_page', String(pageNum));
+                            el.href = '/config?' + params.toString();
+                        }
+                        return el;
+                    }
+                    if (page > 1) projectsPagination.appendChild(makeLink('← Назад', page - 1, false));
+                    for (let i = 1; i <= totalPages; i++) {
+                        projectsPagination.appendChild(makeLink(String(i), i, i === page));
+                    }
+                    if (page < totalPages) projectsPagination.appendChild(makeLink('Вперёд →', page + 1, false));
+                }
+                function fetchProjectsPage(pageNum) {
+                    const params = new URLSearchParams(window.location.search);
+                    params.set('projects_page', String(pageNum));
+                    params.set('partial', 'projects');
+                    fetch('/config?' + params.toString(), {
+                        method: 'GET', headers: { 'Accept': 'application/json' }, credentials: 'same-origin',
+                    })
+                        .then(function (resp) {
+                            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                            return resp.json();
+                        })
+                        .then(function (data) {
+                            const page = data.projects_page || 1;
+                            renderProjects(data.projects || [], page);
+                            renderProjectsHeader(data.projects_sort || 'name', data.projects_dir || 'asc');
+                            renderProjectsPagination(page, data.projects_total_pages || 0);
+                            const newParams = new URLSearchParams(window.location.search);
+                            newParams.set('projects_page', String(page));
+                            history.pushState(null, '', '/config?' + newParams.toString());
+                        })
+                        .catch(function (err) { console.error('AJAX-пагинация проектов не удалась:', err); });
+                }
+                projectsTable.querySelectorAll('a[data-ajax-sort="projects"]').forEach(function (link) {
+                    link.addEventListener('click', function (e) {
+                        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+                        e.preventDefault();
+                        const targetUrl = new URL(link.href, window.location.origin);
+                        const partialUrl = new URL(targetUrl.toString());
+                        partialUrl.searchParams.set('partial', 'projects');
+                        fetch(partialUrl.toString(), {
+                            method: 'GET', headers: { 'Accept': 'application/json' }, credentials: 'same-origin',
+                        })
+                            .then(function (resp) {
+                                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                                return resp.json();
+                            })
+                            .then(function (data) {
+                                const page = data.projects_page || 1;
+                                renderProjects(data.projects || [], page);
+                                renderProjectsHeader(data.projects_sort || 'name', data.projects_dir || 'asc');
+                                renderProjectsPagination(page, data.projects_total_pages || 0);
+                                history.pushState(null, '', targetUrl.pathname + targetUrl.search);
+                            })
+                            .catch(function (err) { console.error('AJAX-сортировка проектов не удалась:', err); });
+                    });
+                });
+                if (projectsPagination) {
+                    projectsPagination.addEventListener('click', function (e) {
+                        const a = e.target.closest('a[data-ajax-page="projects"]');
+                        if (!a) return;
+                        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+                        e.preventDefault();
+                        const url = new URL(a.href, window.location.origin);
+                        const pageNum = parseInt(url.searchParams.get('projects_page') || '1', 10) || 1;
+                        fetchProjectsPage(pageNum);
+                    });
+                }
+            }
+            window.addEventListener('popstate', function () {
+                window.location.reload();
+            });
+        })();
+    </script>
+</body>
+</html>
