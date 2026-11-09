@@ -55,22 +55,22 @@ func (a *App) timesheetsHandler(w http.ResponseWriter, r *http.Request) {
 		if idStr != "" {
 			id, err := strconv.ParseInt(idStr, 10, 64)
 			if err != nil || id <= 0 {
-				auditFail(s.User, "view_timesheets", "employee(id="+idStr+")", "invalid_id")
+				auditFail(r, s.User, "view_timesheets", "employee(id="+idStr+")", "invalid_id")
 			} else {
 				emp, err := getEmployee(a.db, id)
 				if err != nil {
 					if errors.Is(err, errEmployeeNotFound) {
-						auditFail(s.User, "view_timesheets", targetEmployee(id, ""), "not_found")
+						auditFail(r, s.User, "view_timesheets", targetEmployee(id, ""), "not_found")
 					} else {
 						log.Printf("ошибка чтения сотрудника для /timesheets: %v", err)
-						auditFailF(s.User, "view_timesheets", targetEmployee(id, ""), "db_error: %v", err)
+						auditFailF(r, s.User, "view_timesheets", targetEmployee(id, ""), "db_error: %v", err)
 					}
 				} else {
 					data.FullName = formatFullName(emp.LastName, emp.FirstName, emp.MiddleName)
 					data.GroupName = emp.GroupName
 					data.ViewedEmployeeID = emp.ID
 					data.ViewedLogin = emp.Login
-					auditOK(s.User, "view_timesheets", targetEmployee(emp.ID, emp.Login))
+					auditOK(r, s.User, "view_timesheets", targetEmployee(emp.ID, emp.Login))
 				}
 			}
 		}
@@ -276,7 +276,7 @@ func (a *App) addWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 		idStr := strings.TrimSpace(r.FormValue("employee_id"))
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil || id <= 0 {
-			a.auditFailWorkEntry(s.User, "create", "work_entry(employee_id="+idStr+")", "invalid_employee_id")
+			a.auditFailWorkEntry(r, s.User, "create", "work_entry(employee_id="+idStr+")", "invalid_employee_id")
 			a.renderTimesheetsError(w, s, "Некорректный идентификатор сотрудника")
 			return
 		}
@@ -339,68 +339,68 @@ func (a *App) addWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if workDate == "" {
-		a.auditFailWorkEntry(s.User, "create", "work_entry", "empty_date")
+		a.auditFailWorkEntry(r, s.User, "create", "work_entry", "empty_date")
 		reRenderWithError("Укажите дату работ")
 		return
 	}
 	if !isWorkDateAllowed(workDate) {
-		a.auditFailWorkEntry(s.User, "create", "work_entry", "date_in_future")
+		a.auditFailWorkEntry(r, s.User, "create", "work_entry", "date_in_future")
 		reRenderWithError("Дата работ не может быть позже, чем на один день от текущей")
 		return
 	}
 	if !a.isEditableWorkDate(s.Role, workDate) {
-		a.auditFailWorkEntry(s.User, "create", "work_entry", "date_too_old")
+		a.auditFailWorkEntry(r, s.User, "create", "work_entry", "date_too_old")
 		reRenderWithError("Дата работ не может быть старше установленного срока (" +
 			strconv.Itoa(a.cfg.WorkEntriesEditDays) + " дн.)")
 		return
 	}
 	if startTime == "" {
-		a.auditFailWorkEntry(s.User, "create", "work_entry", "empty_start_time")
+		a.auditFailWorkEntry(r, s.User, "create", "work_entry", "empty_start_time")
 		reRenderWithError("Укажите время начала работ")
 		return
 	}
 	if projectIDStr == "" {
-		a.auditFailWorkEntry(s.User, "create", "work_entry", "empty_project")
+		a.auditFailWorkEntry(r, s.User, "create", "work_entry", "empty_project")
 		reRenderWithError("Выберите объект/проект")
 		return
 	}
 	if comment == "" {
-		a.auditFailWorkEntry(s.User, "create", "work_entry", "empty_comment")
+		a.auditFailWorkEntry(r, s.User, "create", "work_entry", "empty_comment")
 		reRenderWithError("Укажите вид работ")
 		return
 	}
 	if len([]rune(comment)) > 512 {
-		a.auditFailWorkEntry(s.User, "create", "work_entry", "comment_too_long")
+		a.auditFailWorkEntry(r, s.User, "create", "work_entry", "comment_too_long")
 		reRenderWithError("Вид работ не должен превышать 512 символов")
 		return
 	}
 	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil || projectID <= 0 {
-		a.auditFailWorkEntry(s.User, "create", "work_entry", "invalid_project_id")
+		a.auditFailWorkEntry(r, s.User, "create", "work_entry", "invalid_project_id")
 		reRenderWithError("Некорректный объект/проект")
 		return
 	}
 	if _, err := getProject(a.db, projectID); err != nil {
-		a.auditFailWorkEntry(s.User, "create", "work_entry", "project_not_found")
+		a.auditFailWorkEntry(r, s.User, "create", "work_entry", "project_not_found")
 		reRenderWithError("Выбранный объект/проект не найден")
 		return
 	}
 	if _, err := getEmployee(a.db, employeeID); err != nil {
-		a.auditFailWorkEntry(s.User, "create", "work_entry", "employee_not_found")
+		a.auditFailWorkEntry(r, s.User, "create", "work_entry", "employee_not_found")
 		reRenderWithError("Сотрудник не найден")
 		return
 	}
 	last, err := getLastWorkEntry(a.db, employeeID)
 	if err != nil {
 		log.Printf("ошибка чтения последней записи табеля: %v", err)
-		a.auditFailWorkEntryF(s.User, "create", "work_entry", "db_error: %v", err)
+		a.auditFailWorkEntryF(r, s.User, "create", "work_entry", "db_error: %v", err)
 		reRenderWithError("Не удалось проверить предыдущие записи")
 		return
 	}
 	if last != nil {
 		if workDate < last.WorkDate ||
 			(workDate == last.WorkDate && startTime < last.StartTime) {
-			a.auditFailWorkEntry(s.User, "create",
+			a.auditFailWorkEntry(r, s.User, "create",
 				"work_entry(employee_id="+strconv.FormatInt(employeeID, 10)+
 					", date="+workDate+", start="+startTime+")",
 				"before_previous")
@@ -411,7 +411,7 @@ func (a *App) addWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	durationMinutes, errMsg := computeDurationMinutes(startTime, mode, endTime, durHStr, durMStr)
 	if errMsg != "" {
-		a.auditFailWorkEntry(s.User, "create", "work_entry", "invalid_duration")
+		a.auditFailWorkEntry(r, s.User, "create", "work_entry", "invalid_duration")
 		reRenderWithError(errMsg)
 		return
 	}
@@ -426,16 +426,16 @@ func (a *App) addWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := addWorkEntry(a.db, entry)
 	if err != nil {
 		if errors.Is(err, errWorkEntryInvalidRef) {
-			a.auditFailWorkEntry(s.User, "create", "work_entry", "invalid_ref")
+			a.auditFailWorkEntry(r, s.User, "create", "work_entry", "invalid_ref")
 			reRenderWithError("Некорректная ссылка на сотрудника или проект")
 			return
 		}
 		log.Printf("ошибка вставки записи табеля: %v", err)
-		a.auditFailWorkEntryF(s.User, "create", "work_entry", "db_error: %v", err)
+		a.auditFailWorkEntryF(r, s.User, "create", "work_entry", "db_error: %v", err)
 		reRenderWithError("Не удалось сохранить запись")
 		return
 	}
-	a.auditOKWorkEntry(s.User, "create", id, employeeID, projectID, workDate, startTime, durationMinutes)
+	a.auditOKWorkEntry(r, s.User, "create", id, employeeID, projectID, workDate, startTime, durationMinutes)
 	month := normalizeWorksMonth(workDate[:7])
 	redirect := "/timesheets?works_month=" + month
 	if s.Role == RoleAdmin {
@@ -475,7 +475,7 @@ func (a *App) editWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !a.isEditableWorkDate(s.Role, existing.WorkDate) {
-		a.auditFailWorkEntry(s.User, "update", targetWorkEntry(existing), "record_locked")
+		a.auditFailWorkEntry(r, s.User, "update", targetWorkEntry(existing), "record_locked")
 		a.renderTimesheetsError(w, s, "Запись старше установленного срока нельзя редактировать")
 		return
 	}
@@ -535,50 +535,50 @@ func (a *App) editWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if workDate == "" {
-		a.auditFailWorkEntry(s.User, "update", "work_entry(id="+idStr+")", "empty_date")
+		a.auditFailWorkEntry(r, s.User, "update", "work_entry(id="+idStr+")", "empty_date")
 		reRenderWithError("Укажите дату работ")
 		return
 	}
 	if !isWorkDateAllowed(workDate) {
-		a.auditFailWorkEntry(s.User, "update", "work_entry(id="+idStr+")", "date_in_future")
+		a.auditFailWorkEntry(r, s.User, "update", "work_entry(id="+idStr+")", "date_in_future")
 		reRenderWithError("Дата работ не может быть позже, чем на один день от текущей")
 		return
 	}
 	if startTime == "" {
-		a.auditFailWorkEntry(s.User, "update", "work_entry(id="+idStr+")", "empty_start_time")
+		a.auditFailWorkEntry(r, s.User, "update", "work_entry(id="+idStr+")", "empty_start_time")
 		reRenderWithError("Укажите время начала работ")
 		return
 	}
 	if projectIDStr == "" {
-		a.auditFailWorkEntry(s.User, "update", "work_entry(id="+idStr+")", "empty_project")
+		a.auditFailWorkEntry(r, s.User, "update", "work_entry(id="+idStr+")", "empty_project")
 		reRenderWithError("Выберите объект/проект")
 		return
 	}
 	if comment == "" {
-		a.auditFailWorkEntry(s.User, "update", "work_entry(id="+idStr+")", "empty_comment")
+		a.auditFailWorkEntry(r, s.User, "update", "work_entry(id="+idStr+")", "empty_comment")
 		reRenderWithError("Укажите вид работ")
 		return
 	}
 	if len([]rune(comment)) > 512 {
-		a.auditFailWorkEntry(s.User, "update", "work_entry(id="+idStr+")", "comment_too_long")
+		a.auditFailWorkEntry(r, s.User, "update", "work_entry(id="+idStr+")", "comment_too_long")
 		reRenderWithError("Вид работ не должен превышать 512 символов")
 		return
 	}
 	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil || projectID <= 0 {
-		a.auditFailWorkEntry(s.User, "update", "work_entry(id="+idStr+")", "invalid_project_id")
+		a.auditFailWorkEntry(r, s.User, "update", "work_entry(id="+idStr+")", "invalid_project_id")
 		reRenderWithError("Некорректный объект/проект")
 		return
 	}
 	if _, err := getProject(a.db, projectID); err != nil {
-		a.auditFailWorkEntry(s.User, "update", "work_entry(id="+idStr+")", "project_not_found")
+		a.auditFailWorkEntry(r, s.User, "update", "work_entry(id="+idStr+")", "project_not_found")
 		reRenderWithError("Выбранный объект/проект не найден")
 		return
 	}
 	prev, next, err := getPrevAndNextWorkEntries(a.db, existing.EmployeeID, id, existing.WorkDate, existing.StartTime)
 	if err != nil {
 		log.Printf("ошибка чтения соседних записей табеля: %v", err)
-		a.auditFailWorkEntryF(s.User, "update", "work_entry(id="+idStr+")", "db_error: %v", err)
+		a.auditFailWorkEntryF(r, s.User, "update", "work_entry(id="+idStr+")", "db_error: %v", err)
 		reRenderWithError("Не удалось проверить соседние записи")
 		return
 	}
@@ -586,7 +586,7 @@ func (a *App) editWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 	if prev != nil {
 		prevKey := prev.WorkDate + " " + prev.StartTime
 		if newKey <= prevKey {
-			a.auditFailWorkEntry(s.User, "update", "work_entry(id="+idStr+")", "before_previous")
+			a.auditFailWorkEntry(r, s.User, "update", "work_entry(id="+idStr+")", "before_previous")
 			reRenderWithError("Дата и время записи должны быть позже предыдущей записи (" +
 				prev.WorkDate + " " + prev.StartTime + ")")
 			return
@@ -595,7 +595,7 @@ func (a *App) editWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 	if next != nil {
 		nextKey := next.WorkDate + " " + next.StartTime
 		if newKey >= nextKey {
-			a.auditFailWorkEntry(s.User, "update", "work_entry(id="+idStr+")", "after_next")
+			a.auditFailWorkEntry(r, s.User, "update", "work_entry(id="+idStr+")", "after_next")
 			reRenderWithError("Дата и время записи должны быть раньше следующей записи (" +
 				next.WorkDate + " " + next.StartTime + ")")
 			return
@@ -603,7 +603,7 @@ func (a *App) editWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	durationMinutes, errMsg := computeDurationMinutes(startTime, mode, endTime, durHStr, durMStr)
 	if errMsg != "" {
-		a.auditFailWorkEntry(s.User, "update", "work_entry(id="+idStr+")", "invalid_duration")
+		a.auditFailWorkEntry(r, s.User, "update", "work_entry(id="+idStr+")", "invalid_duration")
 		reRenderWithError(errMsg)
 		return
 	}
@@ -619,7 +619,7 @@ func (a *App) editWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 	err = updateWorkEntry(a.db, entry)
 	if err != nil {
 		if errors.Is(err, errWorkEntryInvalidRef) {
-			a.auditFailWorkEntry(s.User, "update", "work_entry(id="+idStr+")", "invalid_ref")
+			a.auditFailWorkEntry(r, s.User, "update", "work_entry(id="+idStr+")", "invalid_ref")
 			reRenderWithError("Некорректная ссылка на проект")
 			return
 		}
@@ -628,11 +628,11 @@ func (a *App) editWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		log.Printf("ошибка обновления записи табеля: %v", err)
-		a.auditFailWorkEntryF(s.User, "update", "work_entry(id="+idStr+")", "db_error: %v", err)
+		a.auditFailWorkEntryF(r, s.User, "update", "work_entry(id="+idStr+")", "db_error: %v", err)
 		reRenderWithError("Не удалось сохранить изменения")
 		return
 	}
-	a.auditOKWorkEntry(s.User, "update", id, entry.EmployeeID, projectID, workDate, startTime, durationMinutes)
+	a.auditOKWorkEntry(r, s.User, "update", id, entry.EmployeeID, projectID, workDate, startTime, durationMinutes)
 	month := normalizeWorksMonth(workDate[:7])
 	redirect := "/timesheets?works_month=" + month
 	if s.Role == RoleAdmin {
@@ -672,7 +672,7 @@ func (a *App) deleteWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !a.isEditableWorkDate(s.Role, existing.WorkDate) {
-		a.auditFailWorkEntry(s.User, "delete", targetWorkEntry(existing), "record_locked")
+		a.auditFailWorkEntry(r, s.User, "delete", targetWorkEntry(existing), "record_locked")
 		a.renderTimesheetsError(w, s, "Запись старше установленного срока нельзя удалить")
 		return
 	}
@@ -686,7 +686,7 @@ func (a *App) deleteWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 		a.renderTimesheetsError(w, s, "Не удалось удалить запись")
 		return
 	}
-	a.auditOKWorkEntry(s.User, "delete", id, existing.EmployeeID, existing.ProjectID, existing.WorkDate, existing.StartTime, existing.DurationMinutes)
+	a.auditOKWorkEntry(r, s.User, "delete", id, existing.EmployeeID, existing.ProjectID, existing.WorkDate, existing.StartTime, existing.DurationMinutes)
 	month := normalizeWorksMonth(existing.WorkDate[:7])
 	redirect := "/timesheets?works_month=" + month
 	if s.Role == RoleAdmin {

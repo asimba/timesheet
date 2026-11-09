@@ -67,19 +67,19 @@ func (a *App) addGroupHandler(w http.ResponseWriter, r *http.Request) {
 			})
 	}
 	if name == "" {
-		auditFail(user, "create", target, "empty_name")
+		auditFail(r, user, "create", target, "empty_name")
 		reRenderWithError("Наименование не может быть пустым")
 		return
 	}
 	if len([]rune(name)) > 200 {
-		auditFail(user, "create", target, "name_too_long")
+		auditFail(r, user, "create", target, "name_too_long")
 		reRenderWithError("Наименование слишком длинное (макс. 200 символов)")
 		return
 	}
 	id, err := addGroup(a.db, name)
 	switch {
 	case err == nil:
-		auditOK(user, "create", targetGroup(id, name))
+		auditOK(r, user, "create", targetGroup(id, name))
 		http.Redirect(w, r, configRedirectURL(
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -87,11 +87,11 @@ func (a *App) addGroupHandler(w http.ResponseWriter, r *http.Request) {
 			employeesGroupID,
 		), http.StatusSeeOther)
 	case errors.Is(err, errDuplicateGroup):
-		auditFail(user, "create", target, "duplicate_name")
+		auditFail(r, user, "create", target, "duplicate_name")
 		reRenderWithError("Группа с таким наименованием уже существует")
 	default:
 		log.Printf("ошибка вставки группы: %v", err)
-		auditFailF(user, "create", target, "db_error: %v", err)
+		auditFailF(r, user, "create", target, "db_error: %v", err)
 		reRenderWithError("Не удалось сохранить группу")
 	}
 }
@@ -111,7 +111,7 @@ func (a *App) editGroupHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimSpace(r.FormValue("id"))
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
-		auditFail(user, "update", "group(id="+idStr+")", "invalid_id")
+		auditFail(r, user, "update", "group(id="+idStr+")", "invalid_id")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -136,19 +136,19 @@ func (a *App) editGroupHandler(w http.ResponseWriter, r *http.Request) {
 			})
 	}
 	if name == "" {
-		auditFail(user, "update", target, "empty_name")
+		auditFail(r, user, "update", target, "empty_name")
 		reRenderWithEdit("Наименование не может быть пустым")
 		return
 	}
 	if len([]rune(name)) > 200 {
-		auditFail(user, "update", target, "name_too_long")
+		auditFail(r, user, "update", target, "name_too_long")
 		reRenderWithEdit("Наименование слишком длинное (макс. 200 символов)")
 		return
 	}
 	err = updateGroup(a.db, Group{ID: id, Name: name})
 	switch {
 	case err == nil:
-		auditOK(user, "update", target)
+		auditOK(r, user, "update", target)
 		http.Redirect(w, r, configRedirectURL(
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -156,10 +156,10 @@ func (a *App) editGroupHandler(w http.ResponseWriter, r *http.Request) {
 			employeesGroupID,
 		), http.StatusSeeOther)
 	case errors.Is(err, errDuplicateGroup):
-		auditFail(user, "update", target, "duplicate_name")
+		auditFail(r, user, "update", target, "duplicate_name")
 		reRenderWithEdit("Группа с таким наименованием уже существует")
 	case errors.Is(err, errGroupNotFound):
-		auditFail(user, "update", target, "not_found")
+		auditFail(r, user, "update", target, "not_found")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -170,7 +170,7 @@ func (a *App) editGroupHandler(w http.ResponseWriter, r *http.Request) {
 			})
 	default:
 		log.Printf("ошибка обновления группы: %v", err)
-		auditFailF(user, "update", target, "db_error: %v", err)
+		auditFailF(r, user, "update", target, "db_error: %v", err)
 		reRenderWithEdit("Не удалось сохранить изменения")
 	}
 }
@@ -190,7 +190,7 @@ func (a *App) deleteGroupHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimSpace(r.FormValue("id"))
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
-		auditFail(user, "delete", "group(id="+idStr+")", "invalid_id")
+		auditFail(r, user, "delete", "group(id="+idStr+")", "invalid_id")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -204,7 +204,7 @@ func (a *App) deleteGroupHandler(w http.ResponseWriter, r *http.Request) {
 	g, err := getGroup(a.db, id)
 	if err != nil {
 		if errors.Is(err, errGroupNotFound) {
-			auditFail(user, "delete", targetGroup(id, ""), "not_found")
+			auditFail(r, user, "delete", targetGroup(id, ""), "not_found")
 			a.renderConfigPageWith(w, user,
 				groupsDir, groupsPage,
 				projectsSort, projectsDir, projectsPage,
@@ -216,7 +216,7 @@ func (a *App) deleteGroupHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		log.Printf("ошибка чтения группы: %v", err)
-		auditFailF(user, "delete", targetGroup(id, ""), "db_error: %v", err)
+		auditFailF(r, user, "delete", targetGroup(id, ""), "db_error: %v", err)
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -231,7 +231,7 @@ func (a *App) deleteGroupHandler(w http.ResponseWriter, r *http.Request) {
 	err = deleteGroup(a.db, id)
 	switch {
 	case err == nil:
-		auditOK(user, "delete", target)
+		auditOK(r, user, "delete", target)
 		http.Redirect(w, r, configRedirectURL(
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -239,7 +239,7 @@ func (a *App) deleteGroupHandler(w http.ResponseWriter, r *http.Request) {
 			employeesGroupID,
 		), http.StatusSeeOther)
 	case errors.Is(err, errGroupHasEmployees):
-		auditFail(user, "delete", target, "has_employees")
+		auditFail(r, user, "delete", target, "has_employees")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -249,7 +249,7 @@ func (a *App) deleteGroupHandler(w http.ResponseWriter, r *http.Request) {
 				d.PageError = "Нельзя удалить отдел: к нему прикреплены сотрудники"
 			})
 	case errors.Is(err, errGroupNotFound):
-		auditFail(user, "delete", target, "not_found")
+		auditFail(r, user, "delete", target, "not_found")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -260,7 +260,7 @@ func (a *App) deleteGroupHandler(w http.ResponseWriter, r *http.Request) {
 			})
 	default:
 		log.Printf("ошибка удаления группы: %v", err)
-		auditFailF(user, "delete", target, "db_error: %v", err)
+		auditFailF(r, user, "delete", target, "db_error: %v", err)
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,

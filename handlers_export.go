@@ -100,7 +100,7 @@ func (a *App) exportTimesheetsHandler(w http.ResponseWriter, r *http.Request) {
 	if _, err := w.Write(xlsxBytes); err != nil {
 		log.Printf("экспорт: ошибка записи ответа: %v", err)
 	}
-	auditOK(s.User, "export_timesheets",
+	auditOK(r, s.User, "export_timesheets",
 		targetEmployee(emp.ID, emp.Login)+" scope="+scope+" month="+worksMonth)
 }
 
@@ -185,7 +185,7 @@ func (a *App) groupStatsExportHandler(w http.ResponseWriter, r *http.Request) {
 	if _, err := w.Write(xlsxBytes); err != nil {
 		log.Printf("экспорт статистики отдела: ошибка записи ответа: %v", err)
 	}
-	auditOK(s.User, "export_group_stats", targetGroup(group.ID, group.Name)+" scope="+scope)
+	auditOK(r, s.User, "export_group_stats", targetGroup(group.ID, group.Name)+" scope="+scope)
 }
 
 func (a *App) employeeStatsExportHandler(w http.ResponseWriter, r *http.Request) {
@@ -265,7 +265,7 @@ func (a *App) employeeStatsExportHandler(w http.ResponseWriter, r *http.Request)
 	if _, err := w.Write(xlsxBytes); err != nil {
 		log.Printf("экспорт статистики сотрудников: ошибка записи ответа: %v", err)
 	}
-	auditOK(s.User, "export_employee_stats", targetGroup(group.ID, group.Name)+" scope="+scope)
+	auditOK(r, s.User, "export_employee_stats", targetGroup(group.ID, group.Name)+" scope="+scope)
 }
 
 func buildTimesheetXLSX(emp *Employee, worksMonth string, entries []WorkEntry) ([]byte, error) {
@@ -1045,7 +1045,7 @@ func (a *App) individualEmployeeStatsExportHandler(w http.ResponseWriter, r *htt
 	if _, err := w.Write(xlsxBytes); err != nil {
 		log.Printf("экспорт статистики сотрудника: ошибка записи ответа: %v", err)
 	}
-	auditOK(s.User, "export_individual_employee_stats", targetEmployee(emp.ID, emp.Login)+" scope="+scope)
+	auditOK(r, s.User, "export_individual_employee_stats", targetEmployee(emp.ID, emp.Login)+" scope="+scope)
 }
 
 func buildIndividualEmployeeStatsXLSX(groupName, empName string, sheets []employeeSheetData) ([]byte, error) {
@@ -1090,35 +1090,29 @@ func buildIndividualEmployeeStatsSheetXML(groupName, empName, worksMonth string,
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
 	b.WriteString(`<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">`)
-	
 	b.WriteString(`<cols>`)
 	b.WriteString(`<col min="1" max="1" width="15" customWidth="1"/>`)
 	b.WriteString(`<col min="2" max="2" width="60" customWidth="1"/>`)
 	b.WriteString(`<col min="3" max="3" width="22" customWidth="1"/>`)
 	b.WriteString(`<col min="4" max="4" width="25" customWidth="1"/>`)
 	b.WriteString(`</cols>`)
-	
 	b.WriteString(`<sheetData>`)
-	
 	fmt.Fprintf(&b, `<row r="1">`)
 	fmt.Fprintf(&b, `<c r="A1" t="inlineStr" s="6"><is><t xml:space="preserve">%s</t></is></c>`, xmlEscape("Сотрудник:"))
 	fmt.Fprintf(&b, `<c r="B1" t="inlineStr" s="0"><is><t xml:space="preserve">%s</t></is></c>`, xmlEscape(empName))
 	fmt.Fprintf(&b, `<c r="C1" s="0"/>`)
 	b.WriteString(`</row>`)
-	
 	fmt.Fprintf(&b, `<row r="2">`)
 	fmt.Fprintf(&b, `<c r="A2" t="inlineStr" s="6"><is><t xml:space="preserve">%s</t></is></c>`, xmlEscape("Отдел:"))
 	fmt.Fprintf(&b, `<c r="B2" t="inlineStr" s="0"><is><t xml:space="preserve">%s</t></is></c>`, xmlEscape(groupName))
 	fmt.Fprintf(&b, `<c r="C2" s="0"/>`)
 	b.WriteString(`</row>`)
-	
 	fmt.Fprintf(&b, `<row r="3">`)
 	fmt.Fprintf(&b, `<c r="A3" t="inlineStr" s="6"><is><t xml:space="preserve">%s</t></is></c>`, xmlEscape("Месяц:"))
 	fmt.Fprintf(&b, `<c r="B3" t="inlineStr" s="0"><is><t xml:space="preserve">%s</t></is></c>`,
 		xmlEscape(worksMonth+" ("+monthLabel(worksMonth)+")"))
 	fmt.Fprintf(&b, `<c r="C3" s="0"/>`)
 	b.WriteString(`</row>`)
-	
 	headerCells := []cell{
 		{v: "№", style: 3, hasStyle: true},
 		{v: "Объект/проект\n(Кодовое\nобозначение/шифр)", style: 9, hasStyle: true},
@@ -1126,7 +1120,6 @@ func buildIndividualEmployeeStatsSheetXML(groupName, empName, worksMonth string,
 		{v: "Общая длительность работ\n(раб.дн.)", style: 9, hasStyle: true},
 	}
 	writeRow(&b, 5, headerCells, 3, true)
-	
 	type rowData struct {
 		projectName string
 		projectCode string
@@ -1145,7 +1138,6 @@ func buildIndividualEmployeeStatsSheetXML(groupName, empName, worksMonth string,
 		}
 		agg[key].duration += e.DurationMinutes
 	}
-	
 	rowNum := 6
 	idx := 1
 	for _, k := range keys {
@@ -1165,15 +1157,12 @@ func buildIndividualEmployeeStatsSheetXML(groupName, empName, worksMonth string,
 		rowNum++
 		idx++
 	}
-	
 	b.WriteString(`</sheetData>`)
-	
 	b.WriteString(`<mergeCells count="3">`)
 	b.WriteString(`<mergeCell ref="B1:C1"/>`)
 	b.WriteString(`<mergeCell ref="B2:C2"/>`)
 	b.WriteString(`<mergeCell ref="B3:C3"/>`)
 	b.WriteString(`</mergeCells>`)
-	
 	b.WriteString(`</worksheet>`)
 	return b.String()
 }

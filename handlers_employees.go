@@ -1,4 +1,5 @@
 package main
+
 import (
 	"encoding/json"
 	"errors"
@@ -6,8 +7,10 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
 	"golang.org/x/crypto/bcrypt"
 )
+
 func (a *App) addEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -43,59 +46,59 @@ func (a *App) addEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			})
 	}
 	if login == "" {
-		auditFail(user, "create", target, "empty_login")
+		auditFail(r, user, "create", target, "empty_login")
 		reRenderWithAdd("Логин обязателен")
 		return
 	}
 	if password == "" {
-		auditFail(user, "create", target, "empty_password")
+		auditFail(r, user, "create", target, "empty_password")
 		reRenderWithAdd("Пароль обязателен")
 		return
 	}
 	if lastName == "" {
-		auditFail(user, "create", target, "empty_last_name")
+		auditFail(r, user, "create", target, "empty_last_name")
 		reRenderWithAdd("Фамилия обязательна")
 		return
 	}
 	if firstName == "" {
-		auditFail(user, "create", target, "empty_first_name")
+		auditFail(r, user, "create", target, "empty_first_name")
 		reRenderWithAdd("Имя обязательно")
 		return
 	}
 	if groupIDStr == "" {
-		auditFail(user, "create", target, "empty_group")
+		auditFail(r, user, "create", target, "empty_group")
 		reRenderWithAdd("Выберите отдел")
 		return
 	}
 	if !isValidName(lastName) {
-		auditFail(user, "create", target, "invalid_last_name")
+		auditFail(r, user, "create", target, "invalid_last_name")
 		reRenderWithAdd("Фамилия может содержать только буквы, пробел и дефис")
 		return
 	}
 	if !isValidName(firstName) {
-		auditFail(user, "create", target, "invalid_first_name")
+		auditFail(r, user, "create", target, "invalid_first_name")
 		reRenderWithAdd("Имя может содержать только буквы, пробел и дефис")
 		return
 	}
 	if middleName != "" && !isValidName(middleName) {
-		auditFail(user, "create", target, "invalid_middle_name")
+		auditFail(r, user, "create", target, "invalid_middle_name")
 		reRenderWithAdd("Отчество может содержать только буквы, пробел и дефис")
 		return
 	}
 	if len([]rune(login)) > 100 || len([]rune(lastName)) > 100 ||
 		len([]rune(firstName)) > 100 || len([]rune(middleName)) > 100 {
-		auditFail(user, "create", target, "field_too_long")
+		auditFail(r, user, "create", target, "field_too_long")
 		reRenderWithAdd("Превышена максимальная длина поля (100 символов)")
 		return
 	}
 	if len([]rune(password)) < 4 || len([]rune(password)) > 100 {
-		auditFail(user, "create", target, "invalid_password_length")
+		auditFail(r, user, "create", target, "invalid_password_length")
 		reRenderWithAdd("Пароль должен содержать от 4 до 100 символов")
 		return
 	}
 	groupID, err := strconv.ParseInt(groupIDStr, 10, 64)
 	if err != nil {
-		auditFail(user, "create", target, "invalid_group_id")
+		auditFail(r, user, "create", target, "invalid_group_id")
 		reRenderWithAdd("Некорректный отдел")
 		return
 	}
@@ -109,7 +112,7 @@ func (a *App) addEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	err = a.addEmployee(emp, password)
 	switch {
 	case err == nil:
-		auditOK(user, "create", target)
+		auditOK(r, user, "create", target)
 		http.Redirect(w, r, configRedirectURL(
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -117,17 +120,18 @@ func (a *App) addEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			employeesGroupID,
 		), http.StatusSeeOther)
 	case errors.Is(err, errDuplicateLogin):
-		auditFail(user, "create", target, "duplicate_login")
+		auditFail(r, user, "create", target, "duplicate_login")
 		reRenderWithAdd("Сотрудник с таким логином уже существует")
 	case errors.Is(err, errGroupNotFound):
-		auditFail(user, "create", target, "group_not_found")
+		auditFail(r, user, "create", target, "group_not_found")
 		reRenderWithAdd("Выбранный отдел не найден")
 	default:
 		log.Printf("ошибка вставки сотрудника: %v", err)
-		auditFailF(user, "create", target, "db_error: %v", err)
+		auditFailF(r, user, "create", target, "db_error: %v", err)
 		reRenderWithAdd("Не удалось сохранить сотрудника")
 	}
 }
+
 func (a *App) addEmployee(e Employee, password string) error {
 	ok, err := groupExists(a.db, e.GroupID)
 	if err != nil {
@@ -155,6 +159,7 @@ func (a *App) addEmployee(e Employee, password string) error {
 	}
 	return nil
 }
+
 func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -170,7 +175,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimSpace(r.FormValue("id"))
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
-		auditFail(user, "update", "employee(id="+idStr+")", "invalid_id")
+		auditFail(r, user, "update", "employee(id="+idStr+")", "invalid_id")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -189,7 +194,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	existing, gerr := getEmployee(a.db, id)
 	if gerr != nil {
 		if errors.Is(gerr, errEmployeeNotFound) {
-			auditFail(user, "update", targetEmployee(id, ""), "not_found")
+			auditFail(r, user, "update", targetEmployee(id, ""), "not_found")
 			a.renderConfigPageWith(w, user,
 				groupsDir, groupsPage,
 				projectsSort, projectsDir, projectsPage,
@@ -201,7 +206,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		log.Printf("ошибка чтения сотрудника: %v", gerr)
-		auditFailF(user, "update", targetEmployee(id, ""), "db_error: %v", gerr)
+		auditFailF(r, user, "update", targetEmployee(id, ""), "db_error: %v", gerr)
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -231,48 +236,48 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			})
 	}
 	if lastName == "" {
-		auditFail(user, "update", target, "empty_last_name")
+		auditFail(r, user, "update", target, "empty_last_name")
 		reRenderWithEdit("Фамилия обязательна")
 		return
 	}
 	if firstName == "" {
-		auditFail(user, "update", target, "empty_first_name")
+		auditFail(r, user, "update", target, "empty_first_name")
 		reRenderWithEdit("Имя обязательно")
 		return
 	}
 	if groupIDStr == "" {
-		auditFail(user, "update", target, "empty_group")
+		auditFail(r, user, "update", target, "empty_group")
 		reRenderWithEdit("Выберите отдел")
 		return
 	}
 	if !isValidName(lastName) {
-		auditFail(user, "update", target, "invalid_last_name")
+		auditFail(r, user, "update", target, "invalid_last_name")
 		reRenderWithEdit("Фамилия может содержать только буквы, пробел и дефис")
 		return
 	}
 	if !isValidName(firstName) {
-		auditFail(user, "update", target, "invalid_first_name")
+		auditFail(r, user, "update", target, "invalid_first_name")
 		reRenderWithEdit("Имя может содержать только буквы, пробел и дефис")
 		return
 	}
 	if middleName != "" && !isValidName(middleName) {
-		auditFail(user, "update", target, "invalid_middle_name")
+		auditFail(r, user, "update", target, "invalid_middle_name")
 		reRenderWithEdit("Отчество может содержать только буквы, пробел и дефис")
 		return
 	}
 	if len([]rune(lastName)) > 100 || len([]rune(firstName)) > 100 || len([]rune(middleName)) > 100 {
-		auditFail(user, "update", target, "field_too_long")
+		auditFail(r, user, "update", target, "field_too_long")
 		reRenderWithEdit("Превышена максимальная длина поля (100 символов)")
 		return
 	}
 	if password != "" && (len([]rune(password)) < 4 || len([]rune(password)) > 100) {
-		auditFail(user, "update", target, "invalid_password_length")
+		auditFail(r, user, "update", target, "invalid_password_length")
 		reRenderWithEdit("Пароль должен содержать от 4 до 100 символов")
 		return
 	}
 	groupID, err := strconv.ParseInt(groupIDStr, 10, 64)
 	if err != nil {
-		auditFail(user, "update", target, "invalid_group_id")
+		auditFail(r, user, "update", target, "invalid_group_id")
 		reRenderWithEdit("Некорректный отдел")
 		return
 	}
@@ -286,7 +291,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	err = updateEmployee(a.db, emp, password)
 	switch {
 	case err == nil:
-		auditOK(user, "update", target)
+		auditOK(r, user, "update", target)
 		http.Redirect(w, r, configRedirectURL(
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -294,10 +299,10 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			employeesGroupID,
 		), http.StatusSeeOther)
 	case errors.Is(err, errGroupNotFound):
-		auditFail(user, "update", target, "group_not_found")
+		auditFail(r, user, "update", target, "group_not_found")
 		reRenderWithEdit("Выбранный отдел не найден")
 	case errors.Is(err, errEmployeeNotFound):
-		auditFail(user, "update", target, "not_found")
+		auditFail(r, user, "update", target, "not_found")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -308,10 +313,11 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			})
 	default:
 		log.Printf("ошибка обновления сотрудника: %v", err)
-		auditFailF(user, "update", target, "db_error: %v", err)
+		auditFailF(r, user, "update", target, "db_error: %v", err)
 		reRenderWithEdit("Не удалось сохранить изменения")
 	}
 }
+
 func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -327,7 +333,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimSpace(r.FormValue("id"))
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
-		auditFail(user, "delete", "employee(id="+idStr+")", "invalid_id")
+		auditFail(r, user, "delete", "employee(id="+idStr+")", "invalid_id")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -341,7 +347,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	existing, gerr := getEmployee(a.db, id)
 	if gerr != nil {
 		if errors.Is(gerr, errEmployeeNotFound) {
-			auditFail(user, "delete", targetEmployee(id, ""), "not_found")
+			auditFail(r, user, "delete", targetEmployee(id, ""), "not_found")
 			a.renderConfigPageWith(w, user,
 				groupsDir, groupsPage,
 				projectsSort, projectsDir, projectsPage,
@@ -353,7 +359,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		log.Printf("ошибка чтения сотрудника: %v", gerr)
-		auditFailF(user, "delete", targetEmployee(id, ""), "db_error: %v", gerr)
+		auditFailF(r, user, "delete", targetEmployee(id, ""), "db_error: %v", gerr)
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -368,7 +374,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	err = deleteEmployee(a.db, id)
 	switch {
 	case err == nil:
-		auditOK(user, "delete", target)
+		auditOK(r, user, "delete", target)
 		http.Redirect(w, r, configRedirectURL(
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -376,7 +382,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			employeesGroupID,
 		), http.StatusSeeOther)
 	case errors.Is(err, errEmployeeNotFound):
-		auditFail(user, "delete", target, "not_found")
+		auditFail(r, user, "delete", target, "not_found")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -387,7 +393,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			})
 	default:
 		log.Printf("ошибка удаления сотрудника: %v", err)
-		auditFailF(user, "delete", target, "db_error: %v", err)
+		auditFailF(r, user, "delete", target, "db_error: %v", err)
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -398,6 +404,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			})
 	}
 }
+
 func parseOrZero(s string) int64 {
 	n, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
@@ -405,6 +412,7 @@ func parseOrZero(s string) int64 {
 	}
 	return n
 }
+
 func (a *App) generatePasswordHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {

@@ -22,17 +22,14 @@ func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
 	username := r.FormValue("username")
 	password := r.FormValue("password")
-
 	if username == "" || password == "" {
-		auditFail(username, "login", "session", "empty_credentials")
+		auditFail(r, username, "login", "session", "empty_credentials")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		a.tmpl.Login.Execute(w, LoginData{
 			Error:               "Заполните все поля",
@@ -40,20 +37,18 @@ func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
 	for _, admin := range a.cfg.Admins {
 		if username == admin.User && password == admin.Password {
 			setSession(w, Session{User: admin.User, Role: RoleAdmin})
-			auditOK(admin.User, "login", "session role=admin")
+			auditOK(r, admin.User, "login", "session role=admin")
 			http.Redirect(w, r, "/config", http.StatusSeeOther)
 			return
 		}
 	}
-
 	emp, err := getEmployeeByLogin(a.db, username)
 	if err != nil {
 		if errors.Is(err, errEmployeeNotFound) {
-			auditFail(username, "login", "session", "invalid_credentials")
+			auditFail(r, username, "login", "session", "invalid_credentials")
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			a.tmpl.Login.Execute(w, LoginData{
 				Error:               "Неверное имя пользователя или пароль",
@@ -62,7 +57,7 @@ func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		log.Printf("ошибка чтения сотрудника при логине: %v", err)
-		auditFailF(username, "login", "session", "db_error: %v", err)
+		auditFailF(r, username, "login", "session", "db_error: %v", err)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		a.tmpl.Login.Execute(w, LoginData{
 			Error:               "Неверное имя пользователя или пароль",
@@ -70,9 +65,8 @@ func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
 	if err := bcrypt.CompareHashAndPassword([]byte(emp.PasswordHash), []byte(password)); err != nil {
-		auditFail(username, "login", "session", "invalid_credentials")
+		auditFail(r, username, "login", "session", "invalid_credentials")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		a.tmpl.Login.Execute(w, LoginData{
 			Error:               "Неверное имя пользователя или пароль",
@@ -80,9 +74,8 @@ func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
 	setSession(w, Session{User: emp.Login, Role: RoleEmployee, EmployeeID: emp.ID})
-	auditOK(emp.Login, "login", "session role=employee")
+	auditOK(r, emp.Login, "login", "session role=employee")
 	http.Redirect(w, r, "/timesheets", http.StatusSeeOther)
 }
 
