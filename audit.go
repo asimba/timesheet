@@ -8,27 +8,40 @@ import (
 	"strings"
 )
 
+func isIP(s string) bool {
+	return net.ParseIP(s) != nil
+}
+
 func clientIP(r *http.Request) string {
 	if r == nil {
 		return "unknown"
 	}
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if i := strings.IndexByte(xff, ','); i >= 0 {
-			xff = xff[:i]
-		}
-		xff = strings.TrimSpace(xff)
-		if xff != "" {
-			return xff
+		for _, part := range strings.Split(xff, ",") {
+			candidate := strings.TrimSpace(part)
+			if isIP(candidate) {
+				return candidate
+			}
 		}
 	}
-	if xrip := strings.TrimSpace(r.Header.Get("X-Real-IP")); xrip != "" {
+	if xrip := strings.TrimSpace(r.Header.Get("X-Real-IP")); xrip != "" && isIP(xrip) {
 		return xrip
 	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
+	addr := strings.TrimSpace(r.RemoteAddr)
+	if addr == "" {
+		return "unknown"
 	}
-	return host
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		if isIP(addr) {
+			return addr
+		}
+		return "unknown"
+	}
+	if isIP(host) {
+		return host
+	}
+	return "unknown"
 }
 
 func auditOK(r *http.Request, user, action, target string) {
