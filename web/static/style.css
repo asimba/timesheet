@@ -215,6 +215,27 @@ body.page-top {
     order: -1;
     margin-right: 2px;
 }
+.timesheet-count-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 0 4px;
+    font: inherit;
+    color: #8a9bb0;
+    cursor: pointer;
+    line-height: 1.2;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.timesheet-count-btn:hover {
+    background: #f4f7fb;
+    border-color: #b8c6d6;
+    color: #3f6ba0;
+}
+.timesheet-count-btn:focus {
+    outline: none;
+    border-color: #7a9cc6;
+    background: #ffffff;
+}
 .empty {
     font-size: 13px;
     color: #8a9bb0;
@@ -354,6 +375,12 @@ body.page-top {
 .icon-btn.locked:hover {
     background: transparent;
     border-color: transparent;
+}
+.icon-btn--match-btn {
+    width: auto;
+    height: auto;
+    align-self: stretch;
+    padding: 11px 12px;
 }
 .inline-form {
     display: inline-block;

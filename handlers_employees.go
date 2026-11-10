@@ -371,10 +371,10 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	target := targetEmployee(id, existing.Login)
-	err = deleteEmployee(a.db, id)
+	deletedEntries, err := deleteEmployee(a.db, id)
 	switch {
 	case err == nil:
-		auditOK(r, user, "delete", target)
+		auditOK(r, user, "delete", target+" work_entries="+strconv.FormatInt(deletedEntries, 10))
 		http.Redirect(w, r, configRedirectURL(
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,

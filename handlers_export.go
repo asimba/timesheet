@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"log"
@@ -1163,6 +1164,516 @@ func buildIndividualEmployeeStatsSheetXML(groupName, empName, worksMonth string,
 	b.WriteString(`<mergeCell ref="B2:C2"/>`)
 	b.WriteString(`<mergeCell ref="B3:C3"/>`)
 	b.WriteString(`</mergeCells>`)
+	b.WriteString(`</worksheet>`)
+	return b.String()
+}
+
+func (a *App) exportEmployeesCSVHandler(w http.ResponseWriter, r *http.Request) {
+	s, ok := currentSession(r)
+	if !ok {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if s.Role != RoleAdmin {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	employees, err := listEmployees(a.db, "last_name", "asc", 0)
+	if err != nil {
+		log.Printf("экспорт сотрудников (csv): ошибка чтения: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	filename := "employees.csv"
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Cache-Control", "no-store")
+	cw := csv.NewWriter(w)
+	cw.Comma = ';'
+	if err := cw.Write([]string{"Фамилия", "Имя", "Отчество", "Группа/отдел"}); err != nil {
+		log.Printf("экспорт сотрудников (csv): ошибка заголовка: %v", err)
+		return
+	}
+	for _, e := range employees {
+		if err := cw.Write([]string{e.LastName, e.FirstName, e.MiddleName, e.GroupName}); err != nil {
+			log.Printf("экспорт сотрудников (csv): ошибка строки: %v", err)
+			return
+		}
+	}
+	cw.Flush()
+	if err := cw.Error(); err != nil {
+		log.Printf("экспорт сотрудников (csv): ошибка flush: %v", err)
+	}
+	auditOK(r, s.User, "export_employees_csv", "employees(count="+strconv.Itoa(len(employees))+")")
+}
+
+func (a *App) exportEmployeesXLSXHandler(w http.ResponseWriter, r *http.Request) {
+	s, ok := currentSession(r)
+	if !ok {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if s.Role != RoleAdmin {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	employees, err := listEmployees(a.db, "last_name", "asc", 0)
+	if err != nil {
+		log.Printf("экспорт сотрудников (xlsx): ошибка чтения: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	data, err := buildEmployeesXLSX(employees)
+	if err != nil {
+		log.Printf("экспорт сотрудников (xlsx): ошибка сборки: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	filename := "employees.xlsx"
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.Header().Set("Cache-Control", "no-store")
+	if _, err := w.Write(data); err != nil {
+		log.Printf("экспорт сотрудников (xlsx): ошибка записи ответа: %v", err)
+	}
+	auditOK(r, s.User, "export_employees_xlsx", "employees(count="+strconv.Itoa(len(employees))+")")
+}
+
+func buildEmployeesXLSX(employees []Employee) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	zw := zip.NewWriter(buf)
+	files := []struct {
+		name string
+		body []byte
+	}{
+		{"[Content_Types].xml", []byte(buildContentTypesXML(1))},
+		{"_rels/.rels", []byte(rootRelsXML)},
+		{"xl/workbook.xml", []byte(buildEmployeesWorkbookXML())},
+		{"xl/_rels/workbook.xml.rels", []byte(buildWorkbookRelsXMLMulti(1))},
+		{"xl/styles.xml", []byte(stylesXML)},
+		{"xl/worksheets/sheet1.xml", []byte(buildEmployeesSheetXML(employees))},
+	}
+	for _, f := range files {
+		fw, err := zw.Create(f.name)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := fw.Write(f.body); err != nil {
+			return nil, err
+		}
+	}
+	if err := zw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func buildEmployeesWorkbookXML() string {
+	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Сотрудники" sheetId="1" r:id="rId1"/>
+  </sheets>
+</workbook>`
+}
+
+func buildEmployeesSheetXML(employees []Employee) string {
+	maxLast := len([]rune("Фамилия"))
+	maxFirst := len([]rune("Имя"))
+	maxMiddle := len([]rune("Отчество"))
+	maxGroup := len([]rune("Группа/отдел"))
+	for _, e := range employees {
+		if n := len([]rune(e.LastName)); n > maxLast {
+			maxLast = n
+		}
+		if n := len([]rune(e.FirstName)); n > maxFirst {
+			maxFirst = n
+		}
+		if n := len([]rune(e.MiddleName)); n > maxMiddle {
+			maxMiddle = n
+		}
+		if n := len([]rune(e.GroupName)); n > maxGroup {
+			maxGroup = n
+		}
+	}
+	if maxLast > 60 {
+		maxLast = 60
+	}
+	if maxFirst > 60 {
+		maxFirst = 60
+	}
+	if maxMiddle > 60 {
+		maxMiddle = 60
+	}
+	if maxGroup > 100 {
+		maxGroup = 100
+	}
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
+	b.WriteString(`<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">`)
+	b.WriteString(`<cols>`)
+	b.WriteString(`<col min="1" max="1" width="8" customWidth="1"/>`)
+	fmt.Fprintf(&b, `<col min="2" max="2" width="%.2f" customWidth="1"/>`, colWidthFromMaxLen(maxLast))
+	fmt.Fprintf(&b, `<col min="3" max="3" width="%.2f" customWidth="1"/>`, colWidthFromMaxLen(maxFirst))
+	fmt.Fprintf(&b, `<col min="4" max="4" width="%.2f" customWidth="1"/>`, colWidthFromMaxLen(maxMiddle))
+	fmt.Fprintf(&b, `<col min="5" max="5" width="%.2f" customWidth="1"/>`, colWidthFromMaxLen(maxGroup))
+	b.WriteString(`</cols>`)
+	b.WriteString(`<sheetData>`)
+	headerCells := []cell{
+		{v: "№", style: 3, hasStyle: true},
+		{v: "Фамилия", style: 9, hasStyle: true},
+		{v: "Имя", style: 9, hasStyle: true},
+		{v: "Отчество", style: 9, hasStyle: true},
+		{v: "Группа/отдел", style: 9, hasStyle: true},
+	}
+	writeRow(&b, 1, headerCells, 3, true)
+	rowNum := 2
+	for idx, e := range employees {
+		cells := []cell{
+			{v: strconv.Itoa(idx + 1), style: 11, hasStyle: true},
+			{v: e.LastName, style: 8, hasStyle: true},
+			{v: e.FirstName, style: 8, hasStyle: true},
+			{v: e.MiddleName, style: 8, hasStyle: true},
+			{v: e.GroupName, style: 8, hasStyle: true},
+		}
+		writeRow(&b, rowNum, cells, 8, true)
+		rowNum++
+	}
+	b.WriteString(`</sheetData>`)
+	b.WriteString(`</worksheet>`)
+	return b.String()
+}
+
+func (a *App) exportGroupsCSVHandler(w http.ResponseWriter, r *http.Request) {
+	s, ok := currentSession(r)
+	if !ok {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if s.Role != RoleAdmin {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	groups, err := listGroups(a.db, "asc")
+	if err != nil {
+		log.Printf("экспорт отделов (csv): ошибка чтения: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	filename := "groups.csv"
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Cache-Control", "no-store")
+	cw := csv.NewWriter(w)
+	cw.Comma = ';'
+	if err := cw.Write([]string{"Наименование", "Количество сотрудников"}); err != nil {
+		log.Printf("экспорт отделов (csv): ошибка заголовка: %v", err)
+		return
+	}
+	for _, g := range groups {
+		if err := cw.Write([]string{g.Name, strconv.FormatInt(g.EmployeeCount, 10)}); err != nil {
+			log.Printf("экспорт отделов (csv): ошибка строки: %v", err)
+			return
+		}
+	}
+	cw.Flush()
+	if err := cw.Error(); err != nil {
+		log.Printf("экспорт отделов (csv): ошибка flush: %v", err)
+	}
+	auditOK(r, s.User, "export_groups_csv", "groups(count="+strconv.Itoa(len(groups))+")")
+}
+
+func (a *App) exportGroupsXLSXHandler(w http.ResponseWriter, r *http.Request) {
+	s, ok := currentSession(r)
+	if !ok {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if s.Role != RoleAdmin {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	groups, err := listGroups(a.db, "asc")
+	if err != nil {
+		log.Printf("экспорт отделов (xlsx): ошибка чтения: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	data, err := buildGroupsXLSX(groups)
+	if err != nil {
+		log.Printf("экспорт отделов (xlsx): ошибка сборки: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	filename := "groups.xlsx"
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.Header().Set("Cache-Control", "no-store")
+	if _, err := w.Write(data); err != nil {
+		log.Printf("экспорт отделов (xlsx): ошибка записи ответа: %v", err)
+	}
+	auditOK(r, s.User, "export_groups_xlsx", "groups(count="+strconv.Itoa(len(groups))+")")
+}
+
+func buildGroupsXLSX(groups []Group) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	zw := zip.NewWriter(buf)
+	files := []struct {
+		name string
+		body []byte
+	}{
+		{"[Content_Types].xml", []byte(buildContentTypesXML(1))},
+		{"_rels/.rels", []byte(rootRelsXML)},
+		{"xl/workbook.xml", []byte(buildGroupsWorkbookXML())},
+		{"xl/_rels/workbook.xml.rels", []byte(buildWorkbookRelsXMLMulti(1))},
+		{"xl/styles.xml", []byte(stylesXML)},
+		{"xl/worksheets/sheet1.xml", []byte(buildGroupsSheetXML(groups))},
+	}
+	for _, f := range files {
+		fw, err := zw.Create(f.name)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := fw.Write(f.body); err != nil {
+			return nil, err
+		}
+	}
+	if err := zw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func buildGroupsWorkbookXML() string {
+	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Группы и отделы" sheetId="1" r:id="rId1"/>
+  </sheets>
+</workbook>`
+}
+
+func buildGroupsSheetXML(groups []Group) string {
+	maxName := len([]rune("Наименование"))
+	maxCount := len([]rune("Количество сотрудников"))
+	for _, g := range groups {
+		if n := len([]rune(g.Name)); n > maxName {
+			maxName = n
+		}
+	}
+	if maxName > 100 {
+		maxName = 100
+	}
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
+	b.WriteString(`<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">`)
+	b.WriteString(`<cols>`)
+	b.WriteString(`<col min="1" max="1" width="8" customWidth="1"/>`)
+	fmt.Fprintf(&b, `<col min="2" max="2" width="%.2f" customWidth="1"/>`, colWidthFromMaxLen(maxName))
+	fmt.Fprintf(&b, `<col min="3" max="3" width="%.2f" customWidth="1"/>`, colWidthFromMaxLen(maxCount))
+	b.WriteString(`</cols>`)
+	b.WriteString(`<sheetData>`)
+	headerCells := []cell{
+		{v: "№", style: 3, hasStyle: true},
+		{v: "Наименование", style: 9, hasStyle: true},
+		{v: "Количество сотрудников", style: 9, hasStyle: true},
+	}
+	writeRow(&b, 1, headerCells, 3, true)
+	rowNum := 2
+	for idx, g := range groups {
+		countVal := float64(g.EmployeeCount)
+		cells := []cell{
+			{v: strconv.Itoa(idx + 1), style: 11, hasStyle: true},
+			{v: g.Name, style: 8, hasStyle: true},
+			{style: 8, hasStyle: true, numeric: &countVal},
+		}
+		writeRow(&b, rowNum, cells, 8, true)
+		rowNum++
+	}
+	b.WriteString(`</sheetData>`)
+	b.WriteString(`</worksheet>`)
+	return b.String()
+}
+
+func (a *App) exportProjectsCSVHandler(w http.ResponseWriter, r *http.Request) {
+	s, ok := currentSession(r)
+	if !ok {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if s.Role != RoleAdmin {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	projects, err := listProjects(a.db, "name", "asc")
+	if err != nil {
+		log.Printf("экспорт проектов (csv): ошибка чтения: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	filename := "projects.csv"
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Cache-Control", "no-store")
+	cw := csv.NewWriter(w)
+	cw.Comma = ';'
+	if err := cw.Write([]string{"Наименование", "Кодовое обозначение (шифр)"}); err != nil {
+		log.Printf("экспорт проектов (csv): ошибка заголовка: %v", err)
+		return
+	}
+	for _, p := range projects {
+		if err := cw.Write([]string{p.Name, p.Code}); err != nil {
+			log.Printf("экспорт проектов (csv): ошибка строки: %v", err)
+			return
+		}
+	}
+	cw.Flush()
+	if err := cw.Error(); err != nil {
+		log.Printf("экспорт проектов (csv): ошибка flush: %v", err)
+	}
+	auditOK(r, s.User, "export_projects_csv", "projects(count="+strconv.Itoa(len(projects))+")")
+}
+
+func (a *App) exportProjectsXLSXHandler(w http.ResponseWriter, r *http.Request) {
+	s, ok := currentSession(r)
+	if !ok {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if s.Role != RoleAdmin {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	projects, err := listProjects(a.db, "name", "asc")
+	if err != nil {
+		log.Printf("экспорт проектов (xlsx): ошибка чтения: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	data, err := buildProjectsXLSX(projects)
+	if err != nil {
+		log.Printf("экспорт проектов (xlsx): ошибка сборки: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	filename := "projects.xlsx"
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.Header().Set("Cache-Control", "no-store")
+	if _, err := w.Write(data); err != nil {
+		log.Printf("экспорт проектов (xlsx): ошибка записи ответа: %v", err)
+	}
+	auditOK(r, s.User, "export_projects_xlsx", "projects(count="+strconv.Itoa(len(projects))+")")
+}
+
+func buildProjectsXLSX(projects []Project) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	zw := zip.NewWriter(buf)
+	files := []struct {
+		name string
+		body []byte
+	}{
+		{"[Content_Types].xml", []byte(buildContentTypesXML(1))},
+		{"_rels/.rels", []byte(rootRelsXML)},
+		{"xl/workbook.xml", []byte(buildProjectsWorkbookXML())},
+		{"xl/_rels/workbook.xml.rels", []byte(buildWorkbookRelsXMLMulti(1))},
+		{"xl/styles.xml", []byte(stylesXML)},
+		{"xl/worksheets/sheet1.xml", []byte(buildProjectsSheetXML(projects))},
+	}
+	for _, f := range files {
+		fw, err := zw.Create(f.name)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := fw.Write(f.body); err != nil {
+			return nil, err
+		}
+	}
+	if err := zw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func buildProjectsWorkbookXML() string {
+	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Объекты и проекты" sheetId="1" r:id="rId1"/>
+  </sheets>
+</workbook>`
+}
+
+func buildProjectsSheetXML(projects []Project) string {
+	maxName := len([]rune("Наименование"))
+	maxCode := len([]rune("Кодовое обозначение (шифр)"))
+	for _, p := range projects {
+		if n := len([]rune(p.Name)); n > maxName {
+			maxName = n
+		}
+		if n := len([]rune(p.Code)); n > maxCode {
+			maxCode = n
+		}
+	}
+	if maxName > 100 {
+		maxName = 100
+	}
+	if maxCode > 40 {
+		maxCode = 40
+	}
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
+	b.WriteString(`<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">`)
+	b.WriteString(`<cols>`)
+	b.WriteString(`<col min="1" max="1" width="8" customWidth="1"/>`)
+	fmt.Fprintf(&b, `<col min="2" max="2" width="%.2f" customWidth="1"/>`, colWidthFromMaxLen(maxName))
+	fmt.Fprintf(&b, `<col min="3" max="3" width="%.2f" customWidth="1"/>`, colWidthFromMaxLen(maxCode))
+	b.WriteString(`</cols>`)
+	b.WriteString(`<sheetData>`)
+	headerCells := []cell{
+		{v: "№", style: 3, hasStyle: true},
+		{v: "Наименование", style: 9, hasStyle: true},
+		{v: "Кодовое обозначение (шифр)", style: 9, hasStyle: true},
+	}
+	writeRow(&b, 1, headerCells, 3, true)
+	rowNum := 2
+	for idx, p := range projects {
+		cells := []cell{
+			{v: strconv.Itoa(idx + 1), style: 11, hasStyle: true},
+			{v: p.Name, style: 8, hasStyle: true},
+			{v: p.Code, style: 8, hasStyle: true},
+		}
+		writeRow(&b, rowNum, cells, 8, true)
+		rowNum++
+	}
+	b.WriteString(`</sheetData>`)
 	b.WriteString(`</worksheet>`)
 	return b.String()
 }

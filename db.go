@@ -446,19 +446,47 @@ func updateEmployee(db *sql.DB, e Employee, password string) error {
 	return nil
 }
 
-func deleteEmployee(db *sql.DB, id int64) error {
-	res, err := db.Exec(`DELETE FROM employees WHERE id = ?`, id)
+func deleteEmployee(db *sql.DB, id int64) (int64, error) {
+	tx, err := db.Begin()
 	if err != nil {
-		return err
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	var exists int
+	err = tx.QueryRow(`SELECT 1 FROM employees WHERE id = ?`, id).Scan(&exists)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, errEmployeeNotFound
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	res, err := tx.Exec(`DELETE FROM work_entries WHERE employee_id = ?`, id)
+	if err != nil {
+		return 0, err
+	}
+	deletedEntries, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	res, err = tx.Exec(`DELETE FROM employees WHERE id = ?`, id)
+	if err != nil {
+		return 0, err
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if n == 0 {
-		return errEmployeeNotFound
+		return 0, errEmployeeNotFound
 	}
-	return nil
+
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return deletedEntries, nil
 }
 
 func addWorkEntry(db *sql.DB, e WorkEntry) (int64, error) {
@@ -786,7 +814,7 @@ func listWorkEntriesByEmployeeAndMonth(db *sql.DB, employeeID int64, month strin
 		FROM work_entries w
 		JOIN employees e ON e.id = w.employee_id
 		JOIN groups g ON g.id = e.group_id
-		JOIN projects p ON p.id = w.project_id
+		JOIN projects  p ON p.id = w.project_id
 		WHERE w.employee_id = ? AND substr(w.work_date, 1, 7) = ?
 		ORDER BY w.work_date ASC, w.start_time ASC, w.id ASC
 	`, employeeID, month)

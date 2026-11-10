@@ -26,16 +26,21 @@
             </button>
         </p>
         <div id="pageErrorMessage" hidden>{{.PageError}}</div>
-
         <div class="tabs" role="tablist">
             <button type="button" class="tab-btn active" role="tab" data-tab-target="groups" aria-selected="true">Группы и отделы</button>
             <button type="button" class="tab-btn" role="tab" data-tab-target="employees" aria-selected="false">Сотрудники</button>
             <button type="button" class="tab-btn" role="tab" data-tab-target="projects" aria-selected="false">Объекты и проекты</button>
         </div>
-
         <div class="tab-panel active" data-tab="groups" role="tabpanel">
             <div class="actions">
                 <button type="button" class="btn" id="openGroupModalBtn">Добавить группу/отдел</button>
+                <button type="button" class="icon-btn icon-btn--match-btn" id="openGroupsExportModalBtn" title="Экспорт списка отделов" aria-label="Экспорт списка отделов">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M8 2v8"/>
+                        <path d="M5 7l3 3 3-3"/>
+                        <path d="M3 13h10"/>
+                    </svg>
+                </button>
             </div>
             {{if .Groups}}
             <table class="data-table" id="groups-table">
@@ -136,10 +141,16 @@
             <div class="empty">Пока нет ни одной группы</div>
             {{end}}
         </div>
-
         <div class="tab-panel" data-tab="employees" role="tabpanel">
             <div class="actions">
                 <button type="button" class="btn" id="openEmployeeModalBtn">Добавить сотрудника</button>
+                <button type="button" class="icon-btn icon-btn--match-btn" id="openEmployeesExportModalBtn" title="Экспорт списка сотрудников" aria-label="Экспорт списка сотрудников">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M8 2v8"/>
+                        <path d="M5 7l3 3 3-3"/>
+                        <path d="M3 13h10"/>
+                    </svg>
+                </button>
             </div>
             {{if .EmployeesGroupID}}
             <div class="hint-small">· фильтр по отделу · <a class="name-link" href="/config?employees_group_id=0&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page=1">сбросить</a></div>
@@ -192,8 +203,8 @@
                         </td>
                         <td>{{$e.GroupName}}</td>
                         <td class="actions-col-center">
-                            <span class="timesheet-link" title="Количество записей в табеле">
-                                <span class="timesheet-count">({{$e.WorkEntriesCount}})</span>
+                            <span class="timesheet-link">
+                                <button type="button" class="timesheet-count timesheet-count-btn" data-action="stats-timesheet-emp" data-id="{{$e.ID}}" data-name="{{$e.LastName}} {{$e.FirstName}}" title="Экспорт табеля сотрудника" aria-label="Экспорт табеля сотрудника">({{$e.WorkEntriesCount}})</button>
                                 <a class="icon-btn" href="/timesheets?employee_id={{$e.ID}}" title="Табели" aria-label="Табели">
                                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                         <rect x="2" y="3" width="12" height="11" rx="1"/>
@@ -269,10 +280,16 @@
             <div class="empty">Пока нет ни одного сотрудника</div>
             {{end}}
         </div>
-
         <div class="tab-panel" data-tab="projects" role="tabpanel">
             <div class="actions">
                 <button type="button" class="btn" id="openProjectModalBtn">Добавить объект/проект</button>
+                <button type="button" class="icon-btn icon-btn--match-btn" id="openProjectsExportModalBtn" title="Экспорт списка объектов" aria-label="Экспорт списка объектов">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M8 2v8"/>
+                        <path d="M5 7l3 3 3-3"/>
+                        <path d="M3 13h10"/>
+                    </svg>
+                </button>
             </div>
             {{if .Projects}}
             <table class="data-table" id="projects-table">
@@ -367,7 +384,6 @@
             {{end}}
         </div>
     </div>
-
     <div class="modal-overlay" id="groupModalOverlay">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
             <h2 id="groupModalTitle">Добавить группу/отдел</h2>
@@ -610,6 +626,86 @@
             </div>
         </div>
     </div>
+    <div class="modal-overlay" id="employeeTimesheetExportModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="employeeTimesheetExportModalTitle">
+            <h2 id="employeeTimesheetExportModalTitle">Экспорт табеля сотрудника</h2>
+            <p class="hint-small">Выберите, что выгрузить:</p>
+            <div class="export-scope-wrapper">
+                <label class="export-radio-label">
+                    <input type="radio" name="employee_timesheet_export_scope" value="month" checked class="export-radio-input">
+                    <span class="export-radio-text">Текущий месяц</span>
+                </label>
+                <label class="export-radio-label">
+                    <input type="radio" name="employee_timesheet_export_scope" value="all" class="export-radio-input">
+                    <span class="export-radio-text">Все месяцы (каждый месяц — отдельная вкладка)</span>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" data-close="employee-timesheet-export">Отмена</button>
+                <a class="btn" id="employeeTimesheetExportConfirmBtn" href="#">Выгрузить</a>
+            </div>
+        </div>
+    </div>
+    <div class="modal-overlay" id="employeesExportModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="employeesExportModalTitle">
+            <h2 id="employeesExportModalTitle">Экспорт списка сотрудников</h2>
+            <p class="hint-small">Выберите формат файла:</p>
+            <div class="export-scope-wrapper">
+                <label class="export-radio-label">
+                    <input type="radio" name="employees_export_format" value="xlsx" checked class="export-radio-input">
+                    <span class="export-radio-text">Excel (.xlsx)</span>
+                </label>
+                <label class="export-radio-label">
+                    <input type="radio" name="employees_export_format" value="csv" class="export-radio-input">
+                    <span class="export-radio-text">CSV (.csv, разделитель «;», UTF-8)</span>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" data-close="employees-export">Отмена</button>
+                <a class="btn" id="employeesExportConfirmBtn" href="/employees/export/xlsx">Выгрузить</a>
+            </div>
+        </div>
+    </div>
+    <div class="modal-overlay" id="groupsExportModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="groupsExportModalTitle">
+            <h2 id="groupsExportModalTitle">Экспорт списка групп/отделов</h2>
+            <p class="hint-small">Выберите формат файла:</p>
+            <div class="export-scope-wrapper">
+                <label class="export-radio-label">
+                    <input type="radio" name="groups_export_format" value="xlsx" checked class="export-radio-input">
+                    <span class="export-radio-text">Excel (.xlsx)</span>
+                </label>
+                <label class="export-radio-label">
+                    <input type="radio" name="groups_export_format" value="csv" class="export-radio-input">
+                    <span class="export-radio-text">CSV (.csv, разделитель «;», UTF-8)</span>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" data-close="groups-export">Отмена</button>
+                <a class="btn" id="groupsExportConfirmBtn" href="/groups/export/xlsx">Выгрузить</a>
+            </div>
+        </div>
+    </div>
+    <div class="modal-overlay" id="projectsExportModalOverlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="projectsExportModalTitle">
+            <h2 id="projectsExportModalTitle">Экспорт списка объектов/проектов</h2>
+            <p class="hint-small">Выберите формат файла:</p>
+            <div class="export-scope-wrapper">
+                <label class="export-radio-label">
+                    <input type="radio" name="projects_export_format" value="xlsx" checked class="export-radio-input">
+                    <span class="export-radio-text">Excel (.xlsx)</span>
+                </label>
+                <label class="export-radio-label">
+                    <input type="radio" name="projects_export_format" value="csv" class="export-radio-input">
+                    <span class="export-radio-text">CSV (.csv, разделитель «;», UTF-8)</span>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" data-close="projects-export">Отмена</button>
+                <a class="btn" id="projectsExportConfirmBtn" href="/projects/export/xlsx">Выгрузить</a>
+            </div>
+        </div>
+    </div>
     <div class="modal-overlay" id="logoutModalOverlay">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="logoutModalTitle">
             <h2 id="logoutModalTitle">Выход из системы</h2>
@@ -629,7 +725,6 @@
             </div>
         </div>
     </div>
-
     <script>
         (function () {
             const TABS = ['groups', 'employees', 'projects'];
@@ -669,7 +764,6 @@
                 const h = location.hash.replace('#', '');
                 if (TABS.indexOf(h) !== -1) activateTab(h);
             });
-
             function setupModal(overlayId, openBtnId, errorId, tag) {
                 const overlay = document.getElementById(overlayId);
                 const openBtn = openBtnId ? document.getElementById(openBtnId) : null;
@@ -701,6 +795,10 @@
             const groupStatsModal = setupModal('groupStatsModalOverlay', null, null, 'group-stats');
             const employeeStatsModal = setupModal('employeeStatsModalOverlay', null, null, 'employee-stats');
             const individualEmpStatsModal = setupModal('individualEmpStatsModalOverlay', null, null, 'individual-emp-stats');
+            const employeeTimesheetExportModal = setupModal('employeeTimesheetExportModalOverlay', null, null, 'employee-timesheet-export');
+            const employeesExportModal = setupModal('employeesExportModalOverlay', 'openEmployeesExportModalBtn', null, 'employees-export');
+            const groupsExportModal = setupModal('groupsExportModalOverlay', 'openGroupsExportModalBtn', null, 'groups-export');
+            const projectsExportModal = setupModal('projectsExportModalOverlay', 'openProjectsExportModalBtn', null, 'projects-export');
             const logoutModal = setupModal('logoutModalOverlay', 'openLogoutModalBtn', null, 'logout');
             const messageModal = setupModal('messageModalOverlay', null, null, 'message');
             const empLoginInput = document.getElementById('empLogin');
@@ -753,6 +851,8 @@
             const employeeStatsConfirmBtn = document.getElementById('employeeStatsConfirmBtn');
             let currentIndividualEmpId = null;
             const individualEmpStatsConfirmBtn = document.getElementById('individualEmpStatsConfirmBtn');
+            let currentTimesheetEmpId = null;
+            const employeeTimesheetExportConfirmBtn = document.getElementById('employeeTimesheetExportConfirmBtn');
             function openGroupStatsModal(groupId, groupName) {
                 currentStatsGroupId = groupId;
                 document.getElementById('groupStatsModalTitle').textContent = 'Экспорт статистики по объектам: ' + groupName;
@@ -846,6 +946,76 @@
                     }
                 });
             });
+            function openEmployeeTimesheetExportModal(empId, empName) {
+                currentTimesheetEmpId = empId;
+                document.getElementById('employeeTimesheetExportModalTitle').textContent = 'Экспорт табеля сотрудника: ' + empName;
+                const monthRadio = document.querySelector('input[name="employee_timesheet_export_scope"][value="month"]');
+                if (monthRadio) monthRadio.checked = true;
+                const now = new Date();
+                const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+                employeeTimesheetExportConfirmBtn.href = '/timesheets/export?employee_id=' + encodeURIComponent(currentTimesheetEmpId) + '&scope=month&works_month=' + currentMonth;
+                employeeTimesheetExportModal.open();
+            }
+            document.addEventListener('click', function (e) {
+                const btn = e.target.closest('button[data-action="stats-timesheet-emp"]');
+                if (btn) {
+                    e.preventDefault();
+                    openEmployeeTimesheetExportModal(btn.dataset.id, btn.dataset.name);
+                }
+            });
+            document.querySelectorAll('input[name="employee_timesheet_export_scope"]').forEach(function(r) {
+                r.addEventListener('change', function() {
+                    if (currentTimesheetEmpId) {
+                        const scope = document.querySelector('input[name="employee_timesheet_export_scope"]:checked').value;
+                        if (scope === 'month') {
+                            const now = new Date();
+                            const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+                            employeeTimesheetExportConfirmBtn.href = '/timesheets/export?employee_id=' + encodeURIComponent(currentTimesheetEmpId) + '&scope=month&works_month=' + currentMonth;
+                        } else {
+                            employeeTimesheetExportConfirmBtn.href = '/timesheets/export?employee_id=' + encodeURIComponent(currentTimesheetEmpId) + '&scope=all';
+                        }
+                    }
+                });
+            });
+            (function () {
+                const overlay = document.getElementById('employeesExportModalOverlay');
+                const confirmBtn = document.getElementById('employeesExportConfirmBtn');
+                function syncEmployeesExportURL() {
+                    const scopeEl = overlay.querySelector('input[name="employees_export_format"]:checked');
+                    const fmt = scopeEl ? scopeEl.value : 'xlsx';
+                    confirmBtn.href = '/employees/export/' + fmt;
+                }
+                overlay.querySelectorAll('input[name="employees_export_format"]').forEach(function (r) {
+                    r.addEventListener('change', syncEmployeesExportURL);
+                });
+                syncEmployeesExportURL();
+            })();
+            (function () {
+                const overlay = document.getElementById('groupsExportModalOverlay');
+                const confirmBtn = document.getElementById('groupsExportConfirmBtn');
+                function syncGroupsExportURL() {
+                    const scopeEl = overlay.querySelector('input[name="groups_export_format"]:checked');
+                    const fmt = scopeEl ? scopeEl.value : 'xlsx';
+                    confirmBtn.href = '/groups/export/' + fmt;
+                }
+                overlay.querySelectorAll('input[name="groups_export_format"]').forEach(function (r) {
+                    r.addEventListener('change', syncGroupsExportURL);
+                });
+                syncGroupsExportURL();
+            })();
+            (function () {
+                const overlay = document.getElementById('projectsExportModalOverlay');
+                const confirmBtn = document.getElementById('projectsExportConfirmBtn');
+                function syncProjectsExportURL() {
+                    const scopeEl = overlay.querySelector('input[name="projects_export_format"]:checked');
+                    const fmt = scopeEl ? scopeEl.value : 'xlsx';
+                    confirmBtn.href = '/projects/export/' + fmt;
+                }
+                overlay.querySelectorAll('input[name="projects_export_format"]').forEach(function (r) {
+                    r.addEventListener('change', syncProjectsExportURL);
+                });
+                syncProjectsExportURL();
+            })();
             document.querySelectorAll('button[data-action="edit-group"]').forEach(function (btn) {
                 btn.addEventListener('click', function () {
                     document.getElementById('editGroupId').value = btn.dataset.id;
@@ -878,7 +1048,7 @@
             });
             document.addEventListener('keydown', function (e) {
                 if (e.key === 'Escape') {
-                    [groupModal, projectModal, editProjectModal, editGroupModal, employeeModal, editModal, groupStatsModal, employeeStatsModal, individualEmpStatsModal, logoutModal, messageModal].forEach(function (m) {
+                    [groupModal, projectModal, editProjectModal, editGroupModal, employeeModal, editModal, groupStatsModal, employeeStatsModal, individualEmpStatsModal, employeeTimesheetExportModal, employeesExportModal, groupsExportModal, projectsExportModal, logoutModal, messageModal].forEach(function (m) {
                         if (m.overlay.classList.contains('open')) m.overlay.classList.remove('open');
                     });
                 }
@@ -1199,11 +1369,16 @@
                     tdActions.className = 'actions-col-center';
                     const tsWrap = document.createElement('span');
                     tsWrap.className = 'timesheet-link';
-                    tsWrap.title = 'Количество записей в табеле';
-                    const cntSpan = document.createElement('span');
-                    cntSpan.className = 'timesheet-count';
-                    cntSpan.textContent = '(' + (e.work_entries_count || 0) + ')';
-                    tsWrap.appendChild(cntSpan);
+                    const cntBtn = document.createElement('button');
+                    cntBtn.type = 'button';
+                    cntBtn.className = 'timesheet-count timesheet-count-btn';
+                    cntBtn.dataset.action = 'stats-timesheet-emp';
+                    cntBtn.dataset.id = String(e.id);
+                    cntBtn.dataset.name = e.last_name + ' ' + e.first_name;
+                    cntBtn.title = 'Экспорт табеля сотрудника';
+                    cntBtn.setAttribute('aria-label', 'Экспорт табеля сотрудника');
+                    cntBtn.textContent = '(' + (e.work_entries_count || 0) + ')';
+                    tsWrap.appendChild(cntBtn);
                     const tabBtn = document.createElement('a');
                     tabBtn.className = 'icon-btn';
                     tabBtn.href = '/timesheets?employee_id=' + encodeURIComponent(e.id);
