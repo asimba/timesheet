@@ -23,6 +23,7 @@ func (a *App) addEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	groupsDir, groupsPage, projectsSort, projectsDir, projectsPage,
 		employeesSort, employeesDir, employeesPage, employeesGroupID := configParamsFromQuery(r)
+	employeesSearch := normalizeEmployeesSearch(r.URL.Query().Get("employees_search"))
 	login := strings.TrimSpace(r.FormValue("login"))
 	password := r.FormValue("password")
 	lastName := strings.TrimSpace(r.FormValue("last_name"))
@@ -36,6 +37,7 @@ func (a *App) addEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.EmployeeError = errMsg
 				d.AddLogin = login
@@ -117,7 +119,7 @@ func (a *App) addEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
-			employeesGroupID,
+			employeesGroupID, employeesSearch,
 		), http.StatusSeeOther)
 	case errors.Is(err, errDuplicateLogin):
 		auditFail(r, user, "create", target, "duplicate_login")
@@ -172,6 +174,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	groupsDir, groupsPage, projectsSort, projectsDir, projectsPage,
 		employeesSort, employeesDir, employeesPage, employeesGroupID := configParamsFromQuery(r)
+	employeesSearch := normalizeEmployeesSearch(r.URL.Query().Get("employees_search"))
 	idStr := strings.TrimSpace(r.FormValue("id"))
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
@@ -181,6 +184,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Некорректный идентификатор сотрудника"
 			})
@@ -200,6 +204,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 				projectsSort, projectsDir, projectsPage,
 				employeesSort, employeesDir, employeesPage,
 				employeesGroupID,
+				employeesSearch,
 				func(d *ConfigPageData) {
 					d.PageError = "Сотрудник не найден"
 				})
@@ -212,6 +217,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Не удалось сохранить изменения"
 			})
@@ -224,6 +230,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.EditEmployee = &Employee{
 					ID:         id,
@@ -296,7 +303,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
-			employeesGroupID,
+			employeesGroupID, employeesSearch,
 		), http.StatusSeeOther)
 	case errors.Is(err, errGroupNotFound):
 		auditFail(r, user, "update", target, "group_not_found")
@@ -308,6 +315,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Сотрудник не найден"
 			})
@@ -330,6 +338,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	groupsDir, groupsPage, projectsSort, projectsDir, projectsPage,
 		employeesSort, employeesDir, employeesPage, employeesGroupID := configParamsFromQuery(r)
+	employeesSearch := normalizeEmployeesSearch(r.URL.Query().Get("employees_search"))
 	idStr := strings.TrimSpace(r.FormValue("id"))
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
@@ -339,6 +348,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Некорректный идентификатор сотрудника"
 			})
@@ -353,6 +363,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 				projectsSort, projectsDir, projectsPage,
 				employeesSort, employeesDir, employeesPage,
 				employeesGroupID,
+				employeesSearch,
 				func(d *ConfigPageData) {
 					d.PageError = "Сотрудник не найден"
 				})
@@ -365,6 +376,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Не удалось удалить сотрудника"
 			})
@@ -379,7 +391,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
-			employeesGroupID,
+			employeesGroupID, employeesSearch,
 		), http.StatusSeeOther)
 	case errors.Is(err, errEmployeeNotFound):
 		auditFail(r, user, "delete", target, "not_found")
@@ -388,6 +400,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Сотрудник не найден"
 			})
@@ -399,6 +412,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Не удалось удалить сотрудника"
 			})

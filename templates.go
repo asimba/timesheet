@@ -131,6 +131,7 @@ type ConfigPageData struct {
 	EmployeesTotalPages int
 	EmployeesTotal      int
 	EmployeesGroupID    int64
+	EmployeesSearch     string
 
 	PageError string
 

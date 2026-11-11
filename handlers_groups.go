@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -30,6 +31,7 @@ func configRedirectURL(
 	projectsSort, projectsDir string, projectsPage int,
 	employeesSort, employeesDir string, employeesPage int,
 	employeesGroupID int64,
+	employeesSearch string,
 ) string {
 	return "/config?groups_dir=" + groupsDir +
 		"&groups_page=" + strconv.Itoa(groupsPage) +
@@ -39,7 +41,8 @@ func configRedirectURL(
 		"&employees_sort=" + employeesSort +
 		"&employees_dir=" + employeesDir +
 		"&employees_page=" + strconv.Itoa(employeesPage) +
-		"&employees_group_id=" + strconv.FormatInt(employeesGroupID, 10)
+		"&employees_group_id=" + strconv.FormatInt(employeesGroupID, 10) +
+		"&employees_search=" + url.QueryEscape(employeesSearch)
 }
 
 func (a *App) addGroupHandler(w http.ResponseWriter, r *http.Request) {
@@ -54,6 +57,7 @@ func (a *App) addGroupHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	groupsDir, groupsPage, projectsSort, projectsDir, projectsPage,
 		employeesSort, employeesDir, employeesPage, employeesGroupID := configParamsFromQuery(r)
+	employeesSearch := normalizeEmployeesSearch(r.URL.Query().Get("employees_search"))
 	name := strings.TrimSpace(r.FormValue("name"))
 	target := targetGroup(0, name)
 	reRenderWithError := func(errMsg string) {
@@ -62,6 +66,7 @@ func (a *App) addGroupHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.GroupError = errMsg
 			})
@@ -84,7 +89,7 @@ func (a *App) addGroupHandler(w http.ResponseWriter, r *http.Request) {
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
-			employeesGroupID,
+			employeesGroupID, employeesSearch,
 		), http.StatusSeeOther)
 	case errors.Is(err, errDuplicateGroup):
 		auditFail(r, user, "create", target, "duplicate_name")
@@ -108,6 +113,7 @@ func (a *App) editGroupHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	groupsDir, groupsPage, projectsSort, projectsDir, projectsPage,
 		employeesSort, employeesDir, employeesPage, employeesGroupID := configParamsFromQuery(r)
+	employeesSearch := normalizeEmployeesSearch(r.URL.Query().Get("employees_search"))
 	idStr := strings.TrimSpace(r.FormValue("id"))
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
@@ -117,6 +123,7 @@ func (a *App) editGroupHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Некорректный идентификатор группы"
 			})
@@ -130,6 +137,7 @@ func (a *App) editGroupHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.EditGroup = &Group{ID: id, Name: name}
 				d.EditGroupError = errMsg
@@ -153,7 +161,7 @@ func (a *App) editGroupHandler(w http.ResponseWriter, r *http.Request) {
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
-			employeesGroupID,
+			employeesGroupID, employeesSearch,
 		), http.StatusSeeOther)
 	case errors.Is(err, errDuplicateGroup):
 		auditFail(r, user, "update", target, "duplicate_name")
@@ -165,6 +173,7 @@ func (a *App) editGroupHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Группа не найдена"
 			})
@@ -187,6 +196,7 @@ func (a *App) deleteGroupHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	groupsDir, groupsPage, projectsSort, projectsDir, projectsPage,
 		employeesSort, employeesDir, employeesPage, employeesGroupID := configParamsFromQuery(r)
+	employeesSearch := normalizeEmployeesSearch(r.URL.Query().Get("employees_search"))
 	idStr := strings.TrimSpace(r.FormValue("id"))
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
@@ -196,6 +206,7 @@ func (a *App) deleteGroupHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Некорректный идентификатор группы"
 			})
@@ -210,6 +221,7 @@ func (a *App) deleteGroupHandler(w http.ResponseWriter, r *http.Request) {
 				projectsSort, projectsDir, projectsPage,
 				employeesSort, employeesDir, employeesPage,
 				employeesGroupID,
+				employeesSearch,
 				func(d *ConfigPageData) {
 					d.PageError = "Группа не найдена"
 				})
@@ -222,6 +234,7 @@ func (a *App) deleteGroupHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Не удалось удалить группу"
 			})
@@ -236,7 +249,7 @@ func (a *App) deleteGroupHandler(w http.ResponseWriter, r *http.Request) {
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
-			employeesGroupID,
+			employeesGroupID, employeesSearch,
 		), http.StatusSeeOther)
 	case errors.Is(err, errGroupHasEmployees):
 		auditFail(r, user, "delete", target, "has_employees")
@@ -245,6 +258,7 @@ func (a *App) deleteGroupHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Нельзя удалить отдел: к нему прикреплены сотрудники"
 			})
@@ -255,6 +269,7 @@ func (a *App) deleteGroupHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Группа не найдена"
 			})
@@ -266,6 +281,7 @@ func (a *App) deleteGroupHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Не удалось удалить группу"
 			})

@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 	sqlite "modernc.org/sqlite"
@@ -333,7 +334,7 @@ func deleteProject(db *sql.DB, id int64) error {
 	return nil
 }
 
-func listEmployees(db *sql.DB, sortField, dir string, groupID int64) ([]Employee, error) {
+func listEmployees(db *sql.DB, sortField, dir string, groupID int64, searchQuery string) ([]Employee, error) {
 	col := "e.login"
 	switch sortField {
 	case "last_name":
@@ -359,11 +360,24 @@ func listEmployees(db *sql.DB, sortField, dir string, groupID int64) ([]Employee
 		return nil, err
 	}
 	defer rows.Close()
+	searchLower := strings.ToLower(strings.TrimSpace(searchQuery))
 	var employees []Employee
 	for rows.Next() {
 		var e Employee
 		if err := rows.Scan(&e.ID, &e.Login, &e.LastName, &e.FirstName, &e.MiddleName, &e.GroupID, &e.GroupName, &e.WorkEntriesCount); err != nil {
 			return nil, err
+		}
+		if searchLower != "" {
+			lastName := strings.ToLower(e.LastName)
+			firstName := strings.ToLower(e.FirstName)
+			middleName := strings.ToLower(e.MiddleName)
+			login := strings.ToLower(e.Login)
+			if !strings.Contains(lastName, searchLower) &&
+				!strings.Contains(firstName, searchLower) &&
+				!strings.Contains(middleName, searchLower) &&
+				!strings.Contains(login, searchLower) {
+				continue
+			}
 		}
 		employees = append(employees, e)
 	}
@@ -452,7 +466,6 @@ func deleteEmployee(db *sql.DB, id int64) (int64, error) {
 		return 0, err
 	}
 	defer tx.Rollback()
-
 	var exists int
 	err = tx.QueryRow(`SELECT 1 FROM employees WHERE id = ?`, id).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -461,7 +474,6 @@ func deleteEmployee(db *sql.DB, id int64) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-
 	res, err := tx.Exec(`DELETE FROM work_entries WHERE employee_id = ?`, id)
 	if err != nil {
 		return 0, err
@@ -470,7 +482,6 @@ func deleteEmployee(db *sql.DB, id int64) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-
 	res, err = tx.Exec(`DELETE FROM employees WHERE id = ?`, id)
 	if err != nil {
 		return 0, err
@@ -482,7 +493,6 @@ func deleteEmployee(db *sql.DB, id int64) (int64, error) {
 	if n == 0 {
 		return 0, errEmployeeNotFound
 	}
-
 	if err := tx.Commit(); err != nil {
 		return 0, err
 	}

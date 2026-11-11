@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -28,6 +29,7 @@ func (a *App) configPageHandler(w http.ResponseWriter, r *http.Request) {
 	employeesDir := normalizeEmployeesDir(r.URL.Query().Get("employees_dir"))
 	employeesPage := normalizeEmployeesPage(r.URL.Query().Get("employees_page"))
 	employeesGroupID := normalizeEmployeesGroupID(r.URL.Query().Get("employees_group_id"))
+	employeesSearch := normalizeEmployeesSearch(r.URL.Query().Get("employees_search"))
 	switch r.URL.Query().Get("partial") {
 	case "groups":
 		a.writeGroupsPartial(w, groupsDir, groupsPage)
@@ -36,7 +38,7 @@ func (a *App) configPageHandler(w http.ResponseWriter, r *http.Request) {
 		a.writeProjectsPartial(w, projectsSort, projectsDir, projectsPage)
 		return
 	case "employees":
-		a.writeEmployeesPartial(w, employeesSort, employeesDir, employeesPage, employeesGroupID)
+		a.writeEmployeesPartial(w, employeesSort, employeesDir, employeesPage, employeesGroupID, employeesSearch)
 		return
 	}
 	a.renderConfigPageWith(w, user,
@@ -44,6 +46,7 @@ func (a *App) configPageHandler(w http.ResponseWriter, r *http.Request) {
 		projectsSort, projectsDir, projectsPage,
 		employeesSort, employeesDir, employeesPage,
 		employeesGroupID,
+		employeesSearch,
 		nil)
 }
 
@@ -196,8 +199,8 @@ func (a *App) writeProjectsPartial(w http.ResponseWriter, projectsSort, projects
 	}
 }
 
-func (a *App) writeEmployeesPartial(w http.ResponseWriter, employeesSort, employeesDir string, employeesPage int, employeesGroupID int64) {
-	all, err := listEmployees(a.db, employeesSort, employeesDir, employeesGroupID)
+func (a *App) writeEmployeesPartial(w http.ResponseWriter, employeesSort, employeesDir string, employeesPage int, employeesGroupID int64, employeesSearch string) {
+	all, err := listEmployees(a.db, employeesSort, employeesDir, employeesGroupID, employeesSearch)
 	if err != nil {
 		log.Printf("ошибка чтения сотрудников: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -223,6 +226,7 @@ func (a *App) writeEmployeesPartial(w http.ResponseWriter, employeesSort, employ
 		TotalPages       int            `json:"employees_total_pages"`
 		Total            int            `json:"employees_total"`
 		EmployeesGroupID int64          `json:"employees_group_id"`
+		EmployeesSearch  string         `json:"employees_search"`
 	}{
 		Employees:        make([]employeeJSON, 0, len(items)),
 		EmployeesSort:    employeesSort,
@@ -231,6 +235,7 @@ func (a *App) writeEmployeesPartial(w http.ResponseWriter, employeesSort, employ
 		TotalPages:       totalPages,
 		Total:            total,
 		EmployeesGroupID: employeesGroupID,
+		EmployeesSearch:  employeesSearch,
 	}
 	for _, e := range items {
 		resp.Employees = append(resp.Employees, employeeJSON{
@@ -310,6 +315,10 @@ func normalizeEmployeesGroupID(p string) int64 {
 	return n
 }
 
+func normalizeEmployeesSearch(s string) string {
+	return strings.TrimSpace(s)
+}
+
 func normalizePage(p string) int {
 	if p == "" {
 		return 1
@@ -336,6 +345,7 @@ func (a *App) renderConfigPage(w http.ResponseWriter, user, groupErr, employeeEr
 		"name", "asc", 1,
 		"login", "asc", 1,
 		0,
+		"",
 		func(d *ConfigPageData) {
 			d.GroupError = groupErr
 			d.EmployeeError = employeeErr
@@ -348,6 +358,7 @@ func (a *App) renderConfigPageWithPageError(w http.ResponseWriter, user, pageErr
 		"name", "asc", 1,
 		"login", "asc", 1,
 		0,
+		"",
 		func(d *ConfigPageData) {
 			d.PageError = pageErr
 		})
@@ -359,6 +370,7 @@ func (a *App) renderConfigPageWith(
 	projectsSort, projectsDir string, projectsPage int,
 	employeesSort, employeesDir string, employeesPage int,
 	employeesGroupID int64,
+	employeesSearch string,
 	mutate func(*ConfigPageData),
 ) {
 	allGroups, err := listGroups(a.db, groupsDir)
@@ -377,7 +389,7 @@ func (a *App) renderConfigPageWith(
 	}
 	projects, projectsTotalPages, projectsTotal := paginateProjects(allProjects, projectsPage)
 	projectsPage = effectivePage(projectsPage, projectsTotalPages)
-	allEmployees, err := listEmployees(a.db, employeesSort, employeesDir, employeesGroupID)
+	allEmployees, err := listEmployees(a.db, employeesSort, employeesDir, employeesGroupID, employeesSearch)
 	if err != nil {
 		log.Printf("ошибка чтения сотрудников: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -406,6 +418,7 @@ func (a *App) renderConfigPageWith(
 		EmployeesTotalPages: employeesTotalPages,
 		EmployeesTotal:      employeesTotal,
 		EmployeesGroupID:    employeesGroupID,
+		EmployeesSearch:     employeesSearch,
 	}
 	if mutate != nil {
 		mutate(data)

@@ -20,6 +20,7 @@ func (a *App) addProjectHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	groupsDir, groupsPage, projectsSort, projectsDir, projectsPage,
 		employeesSort, employeesDir, employeesPage, employeesGroupID := configParamsFromQuery(r)
+	employeesSearch := normalizeEmployeesSearch(r.URL.Query().Get("employees_search"))
 	name := strings.TrimSpace(r.FormValue("name"))
 	code := strings.TrimSpace(r.FormValue("code"))
 	target := targetProject(0, name, code)
@@ -29,6 +30,7 @@ func (a *App) addProjectHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.ProjectError = errMsg
 				d.AddProjectName = name
@@ -63,7 +65,7 @@ func (a *App) addProjectHandler(w http.ResponseWriter, r *http.Request) {
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
-			employeesGroupID,
+			employeesGroupID, employeesSearch,
 		), http.StatusSeeOther)
 	case errors.Is(err, errDuplicateProjectCode):
 		auditFail(r, user, "create", target, "duplicate_code")
@@ -87,6 +89,7 @@ func (a *App) editProjectHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	groupsDir, groupsPage, projectsSort, projectsDir, projectsPage,
 		employeesSort, employeesDir, employeesPage, employeesGroupID := configParamsFromQuery(r)
+	employeesSearch := normalizeEmployeesSearch(r.URL.Query().Get("employees_search"))
 	idStr := strings.TrimSpace(r.FormValue("id"))
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
@@ -96,6 +99,7 @@ func (a *App) editProjectHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Некорректный идентификатор проекта"
 			})
@@ -110,6 +114,7 @@ func (a *App) editProjectHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.EditProject = &Project{ID: id, Name: name, Code: code}
 				d.EditProjectError = errMsg
@@ -143,7 +148,7 @@ func (a *App) editProjectHandler(w http.ResponseWriter, r *http.Request) {
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
-			employeesGroupID,
+			employeesGroupID, employeesSearch,
 		), http.StatusSeeOther)
 	case errors.Is(err, errDuplicateProjectCode):
 		auditFail(r, user, "update", target, "duplicate_code")
@@ -155,6 +160,7 @@ func (a *App) editProjectHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Проект не найден"
 			})
@@ -177,6 +183,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	groupsDir, groupsPage, projectsSort, projectsDir, projectsPage,
 		employeesSort, employeesDir, employeesPage, employeesGroupID := configParamsFromQuery(r)
+	employeesSearch := normalizeEmployeesSearch(r.URL.Query().Get("employees_search"))
 	idStr := strings.TrimSpace(r.FormValue("id"))
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
@@ -186,6 +193,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Некорректный идентификатор проекта"
 			})
@@ -200,6 +208,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 				projectsSort, projectsDir, projectsPage,
 				employeesSort, employeesDir, employeesPage,
 				employeesGroupID,
+				employeesSearch,
 				func(d *ConfigPageData) {
 					d.PageError = "Проект не найден"
 				})
@@ -212,6 +221,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Не удалось удалить проект"
 			})
@@ -226,7 +236,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
-			employeesGroupID,
+			employeesGroupID, employeesSearch,
 		), http.StatusSeeOther)
 	case errors.Is(err, errProjectHasWorkEntries):
 		auditFail(r, user, "delete", target, "has_work_entries")
@@ -235,6 +245,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Нельзя удалить проект: на него ссылаются записи табеля"
 			})
@@ -245,6 +256,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Проект не найден"
 			})
@@ -256,6 +268,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
+			employeesSearch,
 			func(d *ConfigPageData) {
 				d.PageError = "Не удалось удалить проект"
 			})

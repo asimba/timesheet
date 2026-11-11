@@ -49,7 +49,7 @@
                         <th>№</th>
                         <th>
                             <a class="sort-toggle"
-                               href="/config?groups_dir={{if eq .GroupsDir "asc"}}desc{{else}}asc{{end}}&groups_page=1&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}"
+                               href="/config?groups_dir={{if eq .GroupsDir "asc"}}desc{{else}}asc{{end}}&groups_page=1&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}"
                                data-ajax-sort="groups"
                                data-field="groups_dir"
                                title="Сортировка по наименованию">
@@ -64,7 +64,7 @@
                     <tr>
                         <td class="id-col">{{globalIndex $.GroupsPage $i 10}}</td>
                         <td>
-                            <a class="name-link" href="/config?employees_group_id={{$g.ID}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page=1">{{$g.Name}}</a>
+                            <a class="name-link" href="/config?employees_group_id={{$g.ID}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page=1&employees_search={{$.EmployeesSearch}}#employees">{{$g.Name}}</a>
                             {{if $g.EmployeeCount}}<span class="group-count" title="Количество сотрудников в группе/отделе">({{$g.EmployeeCount}})</span>{{end}}
                         </td>
                         <td class="actions-col">
@@ -92,7 +92,7 @@
                                     <path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/>
                                 </svg>
                             </button>
-                            <form method="POST" action="/groups/delete?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}" class="inline-form"
+                            <form method="POST" action="/groups/delete?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}&employees_search={{$.EmployeesSearch}}" class="inline-form"
                                   onsubmit="return confirm('Удалить группу {{$g.Name}}?');">
                                 <input type="hidden" name="id" value="{{$g.ID}}">
                                 <button type="submit" class="icon-btn danger" title="Удалить" aria-label="Удалить">
@@ -113,7 +113,7 @@
                 {{if gt .GroupsPage 1}}
                 <a class="page-link"
                    data-ajax-page="groups"
-                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{sub .GroupsPage 1}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}">
+                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{sub .GroupsPage 1}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}">
                     ← Назад
                 </a>
                 {{end}}
@@ -123,7 +123,7 @@
                 {{else}}
                 <a class="page-link"
                    data-ajax-page="groups"
-                   href="/config?groups_dir={{$.GroupsDir}}&groups_page={{$p}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}">
+                   href="/config?groups_dir={{$.GroupsDir}}&groups_page={{$p}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}&employees_search={{$.EmployeesSearch}}">
                     {{$p}}
                 </a>
                 {{end}}
@@ -131,7 +131,7 @@
                 {{if lt .GroupsPage .GroupsTotalPages}}
                 <a class="page-link"
                    data-ajax-page="groups"
-                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{add .GroupsPage 1}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}">
+                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{add .GroupsPage 1}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}">
                     Вперёд →
                 </a>
                 {{end}}
@@ -152,8 +152,11 @@
                     </svg>
                 </button>
             </div>
+            <div class="field" style="margin-bottom: 16px;">
+                <input type="text" id="employeesSearchInput" placeholder="Поиск по ФИО или логину..." value="{{.EmployeesSearch}}">
+            </div>
             {{if .EmployeesGroupID}}
-            <div class="hint-small">· фильтр по отделу · <a class="name-link" href="/config?employees_group_id=0&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page=1">сбросить</a></div>
+            <div class="hint-small">· фильтр по отделу · <a class="name-link" href="/config?employees_group_id=0&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page=1&employees_search={{.EmployeesSearch}}#employees">сбросить</a></div>
             {{end}}
             {{if .Employees}}
             <table class="data-table" id="employees-table">
@@ -162,7 +165,7 @@
                         <th>№</th>
                         <th>
                             <a class="sort-toggle"
-                               href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort=login&employees_dir={{if and (eq .EmployeesSort "login") (eq .EmployeesDir "asc")}}desc{{else}}asc{{end}}&employees_page=1&employees_group_id={{.EmployeesGroupID}}"
+                               href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort=login&employees_dir={{if and (eq .EmployeesSort "login") (eq .EmployeesDir "asc")}}desc{{else}}asc{{end}}&employees_page=1&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}"
                                data-ajax-sort="employees"
                                title="Сортировка по логину">
                                 Логин {{if and (eq .EmployeesSort "login") (eq .EmployeesDir "asc")}}↑{{else if eq .EmployeesSort "login"}}↓{{end}}
@@ -170,7 +173,7 @@
                         </th>
                         <th>
                             <a class="sort-toggle"
-                               href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort=last_name&employees_dir={{if and (eq .EmployeesSort "last_name") (eq .EmployeesDir "asc")}}desc{{else}}asc{{end}}&employees_page=1&employees_group_id={{.EmployeesGroupID}}"
+                               href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort=last_name&employees_dir={{if and (eq .EmployeesSort "last_name") (eq .EmployeesDir "asc")}}desc{{else}}asc{{end}}&employees_page=1&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}"
                                data-ajax-sort="employees"
                                title="Сортировка по фамилии">
                                 Фамилия {{if and (eq .EmployeesSort "last_name") (eq .EmployeesDir "asc")}}↑{{else if eq .EmployeesSort "last_name"}}↓{{end}}
@@ -180,7 +183,7 @@
                         <th>Отчество</th>
                         <th>
                             <a class="sort-toggle"
-                               href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort=group_name&employees_dir={{if and (eq .EmployeesSort "group_name") (eq .EmployeesDir "asc")}}desc{{else}}asc{{end}}&employees_page=1&employees_group_id={{.EmployeesGroupID}}"
+                               href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort=group_name&employees_dir={{if and (eq .EmployeesSort "group_name") (eq .EmployeesDir "asc")}}desc{{else}}asc{{end}}&employees_page=1&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}"
                                data-ajax-sort="employees"
                                title="Сортировка по отделу">
                                 Отдел {{if and (eq .EmployeesSort "group_name") (eq .EmployeesDir "asc")}}↑{{else if eq .EmployeesSort "group_name"}}↓{{end}}
@@ -231,7 +234,7 @@
                                     <path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/>
                                 </svg>
                             </button>
-                            <form method="POST" action="/employees/delete?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}" class="inline-form"
+                            <form method="POST" action="/employees/delete?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}&employees_search={{$.EmployeesSearch}}" class="inline-form"
                                   onsubmit="return confirm('Удалить сотрудника {{$e.Login}}?');">
                                 <input type="hidden" name="id" value="{{$e.ID}}">
                                 <button type="submit" class="icon-btn danger" title="Удалить" aria-label="Удалить">
@@ -252,7 +255,7 @@
                 {{if gt .EmployeesPage 1}}
                 <a class="page-link"
                    data-ajax-page="employees"
-                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{sub .EmployeesPage 1}}&employees_group_id={{.EmployeesGroupID}}">
+                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{sub .EmployeesPage 1}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}">
                     ← Назад
                 </a>
                 {{end}}
@@ -262,7 +265,7 @@
                 {{else}}
                 <a class="page-link"
                    data-ajax-page="employees"
-                   href="/config?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$p}}&employees_group_id={{$.EmployeesGroupID}}">
+                   href="/config?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$p}}&employees_group_id={{$.EmployeesGroupID}}&employees_search={{$.EmployeesSearch}}">
                     {{$p}}
                 </a>
                 {{end}}
@@ -270,7 +273,7 @@
                 {{if lt .EmployeesPage .EmployeesTotalPages}}
                 <a class="page-link"
                    data-ajax-page="employees"
-                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{add .EmployeesPage 1}}&employees_group_id={{.EmployeesGroupID}}">
+                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{add .EmployeesPage 1}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}">
                     Вперёд →
                 </a>
                 {{end}}
@@ -298,7 +301,7 @@
                         <th>№</th>
                         <th class="project-name-col">
                             <a class="sort-toggle"
-                               href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort=name&projects_dir={{if and (eq .ProjectsSort "name") (eq .ProjectsDir "asc")}}desc{{else}}asc{{end}}&projects_page=1&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}"
+                               href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort=name&projects_dir={{if and (eq .ProjectsSort "name") (eq .ProjectsDir "asc")}}desc{{else}}asc{{end}}&projects_page=1&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}"
                                data-ajax-sort="projects"
                                title="Сортировка по наименованию">
                                 Наименование {{if and (eq .ProjectsSort "name") (eq .ProjectsDir "asc")}}↑{{else if eq .ProjectsSort "name"}}↓{{end}}
@@ -306,7 +309,7 @@
                         </th>
                         <th>
                             <a class="sort-toggle"
-                               href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort=code&projects_dir={{if and (eq .ProjectsSort "code") (eq .ProjectsDir "asc")}}desc{{else}}asc{{end}}&projects_page=1&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}"
+                               href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort=code&projects_dir={{if and (eq .ProjectsSort "code") (eq .ProjectsDir "asc")}}desc{{else}}asc{{end}}&projects_page=1&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}"
                                data-ajax-sort="projects"
                                title="Сортировка по коду">
                                 Кодовое обозначение {{if and (eq .ProjectsSort "code") (eq .ProjectsDir "asc")}}↑{{else if eq .ProjectsSort "code"}}↓{{end}}
@@ -334,7 +337,7 @@
                                     <path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/>
                                 </svg>
                             </button>
-                            <form method="POST" action="/projects/delete?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}" class="inline-form"
+                            <form method="POST" action="/projects/delete?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}&employees_search={{$.EmployeesSearch}}" class="inline-form"
                                   onsubmit="return confirm('Удалить проект {{$p.Code}}?');">
                                 <input type="hidden" name="id" value="{{$p.ID}}">
                                 <button type="submit" class="icon-btn danger" title="Удалить" aria-label="Удалить">
@@ -355,7 +358,7 @@
                 {{if gt .ProjectsPage 1}}
                 <a class="page-link"
                    data-ajax-page="projects"
-                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{sub .ProjectsPage 1}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}">
+                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{sub .ProjectsPage 1}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}">
                     ← Назад
                 </a>
                 {{end}}
@@ -365,7 +368,7 @@
                 {{else}}
                 <a class="page-link"
                    data-ajax-page="projects"
-                   href="/config?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$p}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}">
+                   href="/config?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$p}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}&employees_search={{$.EmployeesSearch}}">
                     {{$p}}
                 </a>
                 {{end}}
@@ -373,7 +376,7 @@
                 {{if lt .ProjectsPage .ProjectsTotalPages}}
                 <a class="page-link"
                    data-ajax-page="projects"
-                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{add .ProjectsPage 1}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}">
+                   href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{add .ProjectsPage 1}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}">
                     Вперёд →
                 </a>
                 {{end}}
@@ -387,7 +390,7 @@
     <div class="modal-overlay" id="groupModalOverlay">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
             <h2 id="groupModalTitle">Добавить группу/отдел</h2>
-            <form method="POST" action="/groups?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}">
+            <form method="POST" action="/groups?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}">
                 <div class="field">
                     <label for="groupName">Наименование</label>
                     <input type="text" id="groupName" name="name" required maxlength="200" autocomplete="off">
@@ -403,7 +406,7 @@
     <div class="modal-overlay" id="projectModalOverlay">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="projectModalTitle">
             <h2 id="projectModalTitle">Добавить объект/проект</h2>
-            <form method="POST" action="/projects?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}">
+            <form method="POST" action="/projects?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}">
                 <div class="field">
                     <label for="projectName">Наименование</label>
                     <input type="text" id="projectName" name="name" required maxlength="1024" autocomplete="off"
@@ -425,7 +428,7 @@
     <div class="modal-overlay" id="editProjectModalOverlay">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editProjectModalTitle">
             <h2 id="editProjectModalTitle">Редактировать объект/проект</h2>
-            <form method="POST" action="/projects/edit?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}" id="editProjectForm">
+            <form method="POST" action="/projects/edit?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}" id="editProjectForm">
                 <input type="hidden" name="id" id="editProjectId">
                 <div class="field">
                     <label for="editProjectName">Наименование</label>
@@ -446,7 +449,7 @@
     <div class="modal-overlay" id="editGroupModalOverlay">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editGroupModalTitle">
             <h2 id="editGroupModalTitle">Редактировать группу/отдел</h2>
-            <form method="POST" action="/groups/edit?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}" id="editGroupForm">
+            <form method="POST" action="/groups/edit?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}" id="editGroupForm">
                 <input type="hidden" name="id" id="editGroupId">
                 <div class="field">
                     <label for="editGroupName">Наименование</label>
@@ -464,7 +467,7 @@
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="employeeModalTitle">
             <h2 id="employeeModalTitle">Добавить сотрудника</h2>
             {{if .AllGroups}}
-            <form method="POST" action="/employees?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}">
+            <form method="POST" action="/employees?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}">
                 <div class="field">
                     <label for="empLogin">Логин</label>
                     <input type="text" id="empLogin" name="login" required maxlength="100" autocomplete="off"
@@ -524,7 +527,7 @@
     <div class="modal-overlay" id="editEmployeeModalOverlay">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editEmployeeModalTitle">
             <h2 id="editEmployeeModalTitle">Редактировать учётную запись сотрудника</h2>
-            <form method="POST" action="/employees/edit?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}" id="editEmployeeForm">
+            <form method="POST" action="/employees/edit?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}" id="editEmployeeForm">
                 <input type="hidden" name="id" id="editEmpId">
                 <div class="field">
                     <label for="editEmpLastName">Фамилия</label>
@@ -1128,7 +1131,8 @@
                     p.set('employees_sort', '{{.EmployeesSort}}');
                     p.set('employees_dir', '{{.EmployeesDir}}');
                     p.set('employees_page', '1');
-                    aName.href = '/config?' + p.toString();
+                    p.set('employees_search', '{{.EmployeesSearch}}');
+                    aName.href = '/config?' + p.toString() + '#employees';
                     aName.textContent = g.name;
                     tdName.appendChild(aName);
                     if (g.employee_count) {
@@ -1543,6 +1547,40 @@
                         const url = new URL(a.href, window.location.origin);
                         const pageNum = parseInt(url.searchParams.get('employees_page') || '1', 10) || 1;
                         fetchEmployeesPage(pageNum);
+                    });
+                }
+                const searchInput = document.getElementById('employeesSearchInput');
+                if (searchInput) {
+                    let searchTimeout;
+                    searchInput.addEventListener('input', function() {
+                        clearTimeout(searchTimeout);
+                        searchTimeout = setTimeout(() => {
+                            const query = searchInput.value.trim();
+                            const params = new URLSearchParams(window.location.search);
+                            params.set('employees_search', query);
+                            params.set('employees_page', '1');
+                            params.set('partial', 'employees');
+                            fetch('/config?' + params.toString(), {
+                                method: 'GET',
+                                headers: { 'Accept': 'application/json' },
+                                credentials: 'same-origin',
+                            })
+                            .then(function (resp) {
+                                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                                return resp.json();
+                            })
+                            .then(function (data) {
+                                const page = data.employees_page || 1;
+                                renderEmployees(data.employees || [], page);
+                                renderEmployeesHeader(data.employees_sort || 'login', data.employees_dir || 'asc');
+                                renderEmployeesPagination(page, data.employees_total_pages || 0);
+                                const newParams = new URLSearchParams(window.location.search);
+                                newParams.set('employees_search', query);
+                                newParams.set('employees_page', String(page));
+                                history.pushState(null, '', '/config?' + newParams.toString());
+                            })
+                            .catch(function (err) { console.error('AJAX-поиск сотрудников не удался:', err); });
+                        }, 300);
                     });
                 }
             }

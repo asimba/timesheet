@@ -1182,7 +1182,7 @@ func (a *App) exportEmployeesCSVHandler(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	employees, err := listEmployees(a.db, "last_name", "asc", 0)
+	employees, err := listEmployees(a.db, "last_name", "asc", 0, "")
 	if err != nil {
 		log.Printf("экспорт сотрудников (csv): ошибка чтения: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -1225,7 +1225,7 @@ func (a *App) exportEmployeesXLSXHandler(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	employees, err := listEmployees(a.db, "last_name", "asc", 0)
+	employees, err := listEmployees(a.db, "last_name", "asc", 0, "")
 	if err != nil {
 		log.Printf("экспорт сотрудников (xlsx): ошибка чтения: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
