@@ -9,10 +9,10 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 )
-
 func (a *App) exportTimesheetsHandler(w http.ResponseWriter, r *http.Request) {
 	s, ok := currentSession(r)
 	if !ok {
@@ -104,7 +104,6 @@ func (a *App) exportTimesheetsHandler(w http.ResponseWriter, r *http.Request) {
 	auditOK(r, s.User, "export_timesheets",
 		targetEmployee(emp.ID, emp.Login)+" scope="+scope+" month="+worksMonth)
 }
-
 func (a *App) groupStatsExportHandler(w http.ResponseWriter, r *http.Request) {
 	s, ok := currentSession(r)
 	if !ok {
@@ -188,7 +187,6 @@ func (a *App) groupStatsExportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	auditOK(r, s.User, "export_group_stats", targetGroup(group.ID, group.Name)+" scope="+scope)
 }
-
 func (a *App) employeeStatsExportHandler(w http.ResponseWriter, r *http.Request) {
 	s, ok := currentSession(r)
 	if !ok {
@@ -268,32 +266,118 @@ func (a *App) employeeStatsExportHandler(w http.ResponseWriter, r *http.Request)
 	}
 	auditOK(r, s.User, "export_employee_stats", targetGroup(group.ID, group.Name)+" scope="+scope)
 }
-
+func (a *App) projectStatsExportHandler(w http.ResponseWriter, r *http.Request) {
+	s, ok := currentSession(r)
+	if !ok {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if s.Role != RoleAdmin {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	idStr := strings.TrimSpace(r.URL.Query().Get("project_id"))
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || id <= 0 {
+		http.Error(w, "Invalid project_id", http.StatusBadRequest)
+		return
+	}
+	project, err := getProject(a.db, id)
+	if err != nil {
+		if errors.Is(err, errProjectNotFound) {
+			http.Error(w, "Project not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("экспорт статистики проекта: ошибка чтения проекта %d: %v", id, err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	scope := strings.TrimSpace(r.URL.Query().Get("scope"))
+	worksMonth := normalizeWorksMonth(r.URL.Query().Get("works_month"))
+	months, err := listProjectWorkMonths(a.db, id)
+	if err != nil {
+		log.Printf("экспорт статистики проекта: ошибка чтения списка месяцев: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	if len(months) == 0 {
+		months = []string{worksMonth}
+	}
+	var targetMonths []string
+	if scope == "all" {
+		targetMonths = months
+	} else {
+		targetMonths = []string{worksMonth}
+	}
+	allEntries, err := listWorkEntriesByProject(a.db, id)
+	if err != nil {
+		log.Printf("экспорт статистики проекта: ошибка чтения записей: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	sheets := make([]groupSheetData, 0, len(targetMonths))
+	for _, m := range targetMonths {
+		var monthEntries []WorkEntry
+		for _, e := range allEntries {
+			if len(e.WorkDate) >= 7 && e.WorkDate[:7] == m {
+				monthEntries = append(monthEntries, e)
+			}
+		}
+		sheets = append(sheets, groupSheetData{month: m, entries: monthEntries})
+	}
+	xlsxBytes, err := buildProjectStatsXLSX(project, sheets)
+	if err != nil {
+		log.Printf("экспорт статистики проекта: ошибка сборки xlsx: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	suffix := "all"
+	if scope != "all" {
+		suffix = worksMonth
+	}
+	cleanName := strings.Map(func(r rune) rune {
+		if r == '/' || r == '\\' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
+			return '_'
+		}
+		return r
+	}, project.Code)
+	if cleanName == "" {
+		cleanName = "project"
+	}
+	filename := "project_stats_" + cleanName + "_" + suffix + ".xlsx"
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Content-Length", strconv.Itoa(len(xlsxBytes)))
+	w.Header().Set("Cache-Control", "no-store")
+	if _, err := w.Write(xlsxBytes); err != nil {
+		log.Printf("экспорт статистики проекта: ошибка записи ответа: %v", err)
+	}
+	auditOK(r, s.User, "export_project_stats", targetProject(project.ID, project.Name, project.Code)+" scope="+scope)
+}
 func buildTimesheetXLSX(emp *Employee, worksMonth string, entries []WorkEntry) ([]byte, error) {
 	return buildTimesheetXLSXSheets(emp, []sheetData{
 		{month: worksMonth, entries: entries},
 	})
 }
-
 type sheetData struct {
 	month   string
 	entries []WorkEntry
 }
-
 type groupSheetData struct {
 	month   string
 	entries []WorkEntry
 }
-
 type employeeSheetData struct {
 	month   string
 	entries []WorkEntry
 }
-
 func buildTimesheetXLSXAll(emp *Employee, sheets []sheetData) ([]byte, error) {
 	return buildTimesheetXLSXSheets(emp, sheets)
 }
-
 func buildTimesheetXLSXSheets(emp *Employee, sheets []sheetData) ([]byte, error) {
 	if len(sheets) == 0 {
 		sheets = []sheetData{{month: "", entries: nil}}
@@ -349,7 +433,6 @@ func buildTimesheetXLSXSheets(emp *Employee, sheets []sheetData) ([]byte, error)
 	}
 	return buf.Bytes(), nil
 }
-
 func buildGroupStatsXLSX(group *Group, sheets []groupSheetData) ([]byte, error) {
 	if len(sheets) == 0 {
 		sheets = []groupSheetData{{month: "", entries: nil}}
@@ -405,7 +488,6 @@ func buildGroupStatsXLSX(group *Group, sheets []groupSheetData) ([]byte, error) 
 	}
 	return buf.Bytes(), nil
 }
-
 func buildEmployeeStatsXLSX(groupName string, sheets []employeeSheetData) ([]byte, error) {
 	if len(sheets) == 0 {
 		sheets = []employeeSheetData{{month: "", entries: nil}}
@@ -461,7 +543,43 @@ func buildEmployeeStatsXLSX(groupName string, sheets []employeeSheetData) ([]byt
 	}
 	return buf.Bytes(), nil
 }
-
+func buildProjectStatsXLSX(project *Project, sheets []groupSheetData) ([]byte, error) {
+	if len(sheets) == 0 {
+		sheets = []groupSheetData{{month: "", entries: nil}}
+	}
+	buf := new(bytes.Buffer)
+	zw := zip.NewWriter(buf)
+	files := make([]struct {
+		name string
+		body []byte
+	}, 0, 5+len(sheets))
+	files = append(files,
+		struct{ name string; body []byte }{"[Content_Types].xml", []byte(buildContentTypesXML(len(sheets)))},
+		struct{ name string; body []byte }{"_rels/.rels", []byte(rootRelsXML)},
+		struct{ name string; body []byte }{"xl/workbook.xml", []byte(buildProjectWorkbookXML(sheets))},
+		struct{ name string; body []byte }{"xl/_rels/workbook.xml.rels", []byte(buildWorkbookRelsXMLMulti(len(sheets)))},
+		struct{ name string; body []byte }{"xl/styles.xml", []byte(stylesXML)},
+	)
+	for i, sh := range sheets {
+		files = append(files, struct{ name string; body []byte }{
+			fmt.Sprintf("xl/worksheets/sheet%d.xml", i+1),
+			[]byte(buildProjectStatsSheetXML(project, sh.month, sh.entries)),
+		})
+	}
+	for _, f := range files {
+		fw, err := zw.Create(f.name)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := fw.Write(f.body); err != nil {
+			return nil, err
+		}
+	}
+	if err := zw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
 func colWidthFromMaxLen(maxLen int) float64 {
 	if maxLen <= 0 {
 		maxLen = 1
@@ -469,7 +587,6 @@ func colWidthFromMaxLen(maxLen int) float64 {
 	w := float64(maxLen)*1.2 + 2
 	return math.Round(w*100) / 100
 }
-
 func buildContentTypesXML(sheetCount int) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -484,7 +601,6 @@ func buildContentTypesXML(sheetCount int) string {
 	b.WriteString(`</Types>`)
 	return b.String()
 }
-
 func buildWorkbookXMLMulti(sheets []sheetData) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -505,7 +621,6 @@ func buildWorkbookXMLMulti(sheets []sheetData) string {
 	b.WriteString(`</sheets></workbook>`)
 	return b.String()
 }
-
 func buildGroupWorkbookXML(sheets []groupSheetData) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -526,7 +641,6 @@ func buildGroupWorkbookXML(sheets []groupSheetData) string {
 	b.WriteString(`</sheets></workbook>`)
 	return b.String()
 }
-
 func buildEmployeeWorkbookXML(sheets []employeeSheetData) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -547,7 +661,26 @@ func buildEmployeeWorkbookXML(sheets []employeeSheetData) string {
 	b.WriteString(`</sheets></workbook>`)
 	return b.String()
 }
-
+func buildProjectWorkbookXML(sheets []groupSheetData) string {
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
+	b.WriteString(`<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" `)
+	b.WriteString(`xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>`)
+	for i, sh := range sheets {
+		name := monthLabel(sh.month)
+		if name == "" {
+			name = fmt.Sprintf("Лист%d", i+1)
+		}
+		r := []rune(name)
+		if len(r) > 31 {
+			name = string(r[:31])
+		}
+		fmt.Fprintf(&b, `<sheet name="%s" sheetId="%d" r:id="rId%d"/>`,
+			xmlEscape(name), i+1, i+1)
+	}
+	b.WriteString(`</sheets></workbook>`)
+	return b.String()
+}
 func buildWorkbookRelsXMLMulti(sheetCount int) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -559,7 +692,6 @@ func buildWorkbookRelsXMLMulti(sheetCount int) string {
 	b.WriteString(`</Relationships>`)
 	return b.String()
 }
-
 func buildSheetXML(emp *Employee, worksMonth string, entries []WorkEntry) string {
 	maxB := len([]rune("Дата"))
 	maxC := len([]rune("Начало"))
@@ -713,7 +845,6 @@ func buildSheetXML(emp *Employee, worksMonth string, entries []WorkEntry) string
 	b.WriteString(`</worksheet>`)
 	return b.String()
 }
-
 func buildGroupStatsSheetXML(group *Group, worksMonth string, entries []WorkEntry) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -804,7 +935,6 @@ func buildGroupStatsSheetXML(group *Group, worksMonth string, entries []WorkEntr
 	b.WriteString(`</worksheet>`)
 	return b.String()
 }
-
 func buildEmployeeStatsSheetXML(groupName, worksMonth string, entries []WorkEntry) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -879,14 +1009,124 @@ func buildEmployeeStatsSheetXML(groupName, worksMonth string, entries []WorkEntr
 	b.WriteString(`</worksheet>`)
 	return b.String()
 }
-
+func buildProjectStatsSheetXML(project *Project, worksMonth string, entries []WorkEntry) string {
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
+	b.WriteString(`<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">`)
+	b.WriteString(`<cols>`)
+	b.WriteString(`<col min="1" max="1" width="15" customWidth="1"/>`)
+	b.WriteString(`<col min="2" max="2" width="40" customWidth="1"/>`)
+	b.WriteString(`<col min="3" max="3" width="22" customWidth="1"/>`)
+	b.WriteString(`<col min="4" max="4" width="25" customWidth="1"/>`)
+	b.WriteString(`<col min="5" max="5" width="60" customWidth="1"/>`)
+	b.WriteString(`</cols>`)
+	b.WriteString(`<sheetData>`)
+	fmt.Fprintf(&b, `<row r="1" ht="20" customHeight="1">`)
+	fmt.Fprintf(&b, `<c r="A1" t="inlineStr" s="13"><is><t xml:space="preserve">%s</t></is></c>`,
+		xmlEscape("Количество времени затраченного отделами на проект"))
+	b.WriteString(`</row>`)
+	fmt.Fprintf(&b, `<row r="2" ht="30" customHeight="1">`)
+	fmt.Fprintf(&b, `<c r="A2" t="inlineStr" s="6"><is><t xml:space="preserve">%s</t></is></c>`, xmlEscape("Объект/проект:"))
+	projText := project.Name
+	if project.Code != "" {
+		projText += " (" + project.Code + ")"
+	}
+	fmt.Fprintf(&b, `<c r="B2" t="inlineStr" s="16"><is><t xml:space="preserve">%s</t></is></c>`, xmlEscape(projText))
+	b.WriteString(`</row>`)
+	fmt.Fprintf(&b, `<row r="3">`)
+	fmt.Fprintf(&b, `<c r="A3" t="inlineStr" s="6"><is><t xml:space="preserve">%s</t></is></c>`, xmlEscape("Месяц:"))
+	fmt.Fprintf(&b, `<c r="B3" t="inlineStr" s="16"><is><t xml:space="preserve">%s</t></is></c>`,
+		xmlEscape(worksMonth+" ("+monthLabel(worksMonth)+")"))
+	b.WriteString(`</row>`)
+	headerCells := []cell{
+		{v: "№", style: 3, hasStyle: true},
+		{v: "Отдел", style: 9, hasStyle: true},
+		{v: "Общая длительность\nработ\n(ЧЧ:ММ)", style: 9, hasStyle: true},
+		{v: "Общая длительность работ\n(раб.дн.)", style: 9, hasStyle: true},
+		{v: "Задействованные\nсотрудники", style: 9, hasStyle: true},
+	}
+	writeRow(&b, 5, headerCells, 3, true)
+	type rowData struct {
+		groupName string
+		duration  int64
+		employees []string
+		empSeen   map[string]bool
+	}
+	agg := make(map[string]*rowData)
+	var keys []string
+	for _, e := range entries {
+		g := e.GroupName
+		if _, ok := agg[g]; !ok {
+			agg[g] = &rowData{groupName: g, empSeen: make(map[string]bool)}
+			keys = append(keys, g)
+		}
+		agg[g].duration += e.DurationMinutes
+		empName := formatFullName(e.EmployeeLastName, e.EmployeeFirstName, e.EmployeeMiddleName)
+		if empName == "" {
+			empName = e.EmployeeLogin
+		}
+		if empName != "" && !agg[g].empSeen[empName] {
+			agg[g].empSeen[empName] = true
+			agg[g].employees = append(agg[g].employees, empName)
+		}
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	rowNum := 6
+	idx := 1
+	totalDuration := int64(0)
+	for _, k := range keys {
+		rd := agg[k]
+		totalDuration += rd.duration
+		fmt.Fprintf(&b, `<row r="%d">`, rowNum)
+		fmt.Fprintf(&b, `<c r="A%d" t="inlineStr" s="11"><is><t>%d</t></is></c>`, rowNum, idx)
+		fmt.Fprintf(&b, `<c r="B%d" t="inlineStr" s="8"><is><t xml:space="preserve">%s</t></is></c>`, rowNum, xmlEscape(rd.groupName))
+		durVal := float64(rd.duration) / 1440.0
+		fmt.Fprintf(&b, `<c r="C%d" s="10"><v>%s</v></c>`, rowNum, strconv.FormatFloat(durVal, 'f', -1, 64))
+		shifts := float64(rd.duration) / 480.0
+		fmt.Fprintf(&b, `<c r="D%d" s="12"><f>C%d*1440/480</f><v>%s</v></c>`, rowNum, rowNum, strconv.FormatFloat(shifts, 'f', -1, 64))
+		empList := strings.Join(rd.employees, ",\n")
+		fmt.Fprintf(&b, `<c r="E%d" t="inlineStr" s="14"><is><t xml:space="preserve">%s</t></is></c>`, rowNum, xmlEscape(empList))
+		b.WriteString(`</row>`)
+		rowNum++
+		idx++
+	}
+	totalRow := rowNum
+	fmt.Fprintf(&b, `<row r="%d">`, totalRow)
+	fmt.Fprintf(&b, `<c r="A%d" t="inlineStr" s="3"><is><t xml:space="preserve">%s</t></is></c>`,
+		totalRow, xmlEscape("Общая длительность работ"))
+	fmt.Fprintf(&b, `<c r="B%d" s="3"/>`, totalRow)
+	totalDurVal := float64(totalDuration) / 1440.0
+	if len(entries) > 0 {
+		fmt.Fprintf(&b, `<c r="C%d" s="10"><f>SUM(C6:C%d)</f><v>%s</v></c>`,
+			totalRow, totalRow-1, strconv.FormatFloat(totalDurVal, 'f', -1, 64))
+	} else {
+		fmt.Fprintf(&b, `<c r="C%d" s="10"><v>0</v></c>`, totalRow)
+	}
+	totalShiftVal := float64(totalDuration) / 480.0
+	if len(entries) > 0 {
+		fmt.Fprintf(&b, `<c r="D%d" s="12"><f>C%d*1440/480</f><v>%s</v></c>`,
+			totalRow, totalRow, strconv.FormatFloat(totalShiftVal, 'f', -1, 64))
+	} else {
+		fmt.Fprintf(&b, `<c r="D%d" s="12"><v>0</v></c>`, totalRow)
+	}
+	fmt.Fprintf(&b, `<c r="E%d" s="0"/>`, totalRow)
+	b.WriteString(`</row>`)
+	b.WriteString(`</sheetData>`)
+	b.WriteString(`<mergeCells count="4">`)
+	b.WriteString(`<mergeCell ref="A1:E1"/>`)
+	b.WriteString(`<mergeCell ref="B2:E2"/>`)
+	b.WriteString(`<mergeCell ref="B3:E3"/>`)
+	fmt.Fprintf(&b, `<mergeCell ref="A%d:B%d"/>`, totalRow, totalRow)
+	b.WriteString(`</mergeCells>`)
+	b.WriteString(`</worksheet>`)
+	return b.String()
+}
 type cell struct {
 	v        string
 	style    int
 	hasStyle bool
 	numeric  *float64
 }
-
 func writeRow(b *strings.Builder, rowNum int, cells []cell, style int, writeEmpty bool) {
 	fmt.Fprintf(b, `<row r="%d">`, rowNum)
 	for i, c := range cells {
@@ -913,7 +1153,6 @@ func writeRow(b *strings.Builder, rowNum int, cells []cell, style int, writeEmpt
 	}
 	b.WriteString(`</row>`)
 }
-
 func columnLetter(n int) string {
 	var out []byte
 	for n > 0 {
@@ -923,7 +1162,6 @@ func columnLetter(n int) string {
 	}
 	return string(out)
 }
-
 func xmlEscape(s string) string {
 	r := strings.NewReplacer(
 		"&", "&amp;",
@@ -934,7 +1172,6 @@ func xmlEscape(s string) string {
 	)
 	return r.Replace(s)
 }
-
 func endTimeStr(start string, durationMinutes int64) string {
 	h, m, ok := parseHHMMToParts(start)
 	if !ok {
@@ -944,19 +1181,16 @@ func endTimeStr(start string, durationMinutes int64) string {
 	total %= 24 * 60
 	return fmt.Sprintf("%02d:%02d", total/60, total%60)
 }
-
 func durationHHMMStr(minutes int64) string {
 	if minutes < 0 {
 		minutes = 0
 	}
 	return fmt.Sprintf("%02d:%02d", minutes/60, minutes%60)
 }
-
 const rootRelsXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
 </Relationships>`
-
 func buildWorkbookXML(worksMonth string) string {
 	sheetName := monthLabel(worksMonth)
 	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -967,7 +1201,6 @@ func buildWorkbookXML(worksMonth string) string {
   </sheets>
 </workbook>`
 }
-
 func (a *App) individualEmployeeStatsExportHandler(w http.ResponseWriter, r *http.Request) {
 	s, ok := currentSession(r)
 	if !ok {
@@ -1048,7 +1281,6 @@ func (a *App) individualEmployeeStatsExportHandler(w http.ResponseWriter, r *htt
 	}
 	auditOK(r, s.User, "export_individual_employee_stats", targetEmployee(emp.ID, emp.Login)+" scope="+scope)
 }
-
 func buildIndividualEmployeeStatsXLSX(groupName, empName string, sheets []employeeSheetData) ([]byte, error) {
 	if len(sheets) == 0 {
 		sheets = []employeeSheetData{{month: "", entries: nil}}
@@ -1086,7 +1318,6 @@ func buildIndividualEmployeeStatsXLSX(groupName, empName string, sheets []employ
 	}
 	return buf.Bytes(), nil
 }
-
 func buildIndividualEmployeeStatsSheetXML(groupName, empName, worksMonth string, entries []WorkEntry) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -1167,7 +1398,6 @@ func buildIndividualEmployeeStatsSheetXML(groupName, empName, worksMonth string,
 	b.WriteString(`</worksheet>`)
 	return b.String()
 }
-
 func (a *App) exportEmployeesCSVHandler(w http.ResponseWriter, r *http.Request) {
 	s, ok := currentSession(r)
 	if !ok {
@@ -1210,7 +1440,6 @@ func (a *App) exportEmployeesCSVHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	auditOK(r, s.User, "export_employees_csv", "employees(count="+strconv.Itoa(len(employees))+")")
 }
-
 func (a *App) exportEmployeesXLSXHandler(w http.ResponseWriter, r *http.Request) {
 	s, ok := currentSession(r)
 	if !ok {
@@ -1247,7 +1476,6 @@ func (a *App) exportEmployeesXLSXHandler(w http.ResponseWriter, r *http.Request)
 	}
 	auditOK(r, s.User, "export_employees_xlsx", "employees(count="+strconv.Itoa(len(employees))+")")
 }
-
 func buildEmployeesXLSX(employees []Employee) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	zw := zip.NewWriter(buf)
@@ -1276,7 +1504,6 @@ func buildEmployeesXLSX(employees []Employee) ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
-
 func buildEmployeesWorkbookXML() string {
 	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -1285,7 +1512,6 @@ func buildEmployeesWorkbookXML() string {
   </sheets>
 </workbook>`
 }
-
 func buildEmployeesSheetXML(employees []Employee) string {
 	maxLast := len([]rune("Фамилия"))
 	maxFirst := len([]rune("Имя"))
@@ -1352,7 +1578,6 @@ func buildEmployeesSheetXML(employees []Employee) string {
 	b.WriteString(`</worksheet>`)
 	return b.String()
 }
-
 func (a *App) exportGroupsCSVHandler(w http.ResponseWriter, r *http.Request) {
 	s, ok := currentSession(r)
 	if !ok {
@@ -1395,7 +1620,6 @@ func (a *App) exportGroupsCSVHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	auditOK(r, s.User, "export_groups_csv", "groups(count="+strconv.Itoa(len(groups))+")")
 }
-
 func (a *App) exportGroupsXLSXHandler(w http.ResponseWriter, r *http.Request) {
 	s, ok := currentSession(r)
 	if !ok {
@@ -1432,7 +1656,6 @@ func (a *App) exportGroupsXLSXHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	auditOK(r, s.User, "export_groups_xlsx", "groups(count="+strconv.Itoa(len(groups))+")")
 }
-
 func buildGroupsXLSX(groups []Group) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	zw := zip.NewWriter(buf)
@@ -1461,7 +1684,6 @@ func buildGroupsXLSX(groups []Group) ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
-
 func buildGroupsWorkbookXML() string {
 	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -1470,7 +1692,6 @@ func buildGroupsWorkbookXML() string {
   </sheets>
 </workbook>`
 }
-
 func buildGroupsSheetXML(groups []Group) string {
 	maxName := len([]rune("Наименование"))
 	maxCount := len([]rune("Количество сотрудников"))
@@ -1512,7 +1733,6 @@ func buildGroupsSheetXML(groups []Group) string {
 	b.WriteString(`</worksheet>`)
 	return b.String()
 }
-
 func (a *App) exportProjectsCSVHandler(w http.ResponseWriter, r *http.Request) {
 	s, ok := currentSession(r)
 	if !ok {
@@ -1527,7 +1747,7 @@ func (a *App) exportProjectsCSVHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	projects, err := listProjects(a.db, "name", "asc")
+	projects, err := listProjects(a.db, "name", "asc", "")
 	if err != nil {
 		log.Printf("экспорт проектов (csv): ошибка чтения: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -1555,7 +1775,6 @@ func (a *App) exportProjectsCSVHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	auditOK(r, s.User, "export_projects_csv", "projects(count="+strconv.Itoa(len(projects))+")")
 }
-
 func (a *App) exportProjectsXLSXHandler(w http.ResponseWriter, r *http.Request) {
 	s, ok := currentSession(r)
 	if !ok {
@@ -1570,7 +1789,7 @@ func (a *App) exportProjectsXLSXHandler(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	projects, err := listProjects(a.db, "name", "asc")
+	projects, err := listProjects(a.db, "name", "asc", "")
 	if err != nil {
 		log.Printf("экспорт проектов (xlsx): ошибка чтения: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -1592,7 +1811,6 @@ func (a *App) exportProjectsXLSXHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	auditOK(r, s.User, "export_projects_xlsx", "projects(count="+strconv.Itoa(len(projects))+")")
 }
-
 func buildProjectsXLSX(projects []Project) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	zw := zip.NewWriter(buf)
@@ -1621,7 +1839,6 @@ func buildProjectsXLSX(projects []Project) ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
-
 func buildProjectsWorkbookXML() string {
 	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -1630,7 +1847,6 @@ func buildProjectsWorkbookXML() string {
   </sheets>
 </workbook>`
 }
-
 func buildProjectsSheetXML(projects []Project) string {
 	maxName := len([]rune("Наименование"))
 	maxCode := len([]rune("Кодовое обозначение (шифр)"))
@@ -1677,7 +1893,6 @@ func buildProjectsSheetXML(projects []Project) string {
 	b.WriteString(`</worksheet>`)
 	return b.String()
 }
-
 const stylesXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <numFmts count="2">
@@ -1705,7 +1920,7 @@ const stylesXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
     <xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyBorder="1"/>
   </cellStyleXfs>
-  <cellXfs count="15">
+  <cellXfs count="17">
     <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>
     <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
     <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
@@ -1721,5 +1936,7 @@ const stylesXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <xf numFmtId="166" fontId="0" fillId="0" borderId="1" xfId="1" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
     <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
     <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>
   </cellXfs>
 </styleSheet>`

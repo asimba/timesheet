@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 )
-
 func (a *App) addProjectHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -19,7 +18,7 @@ func (a *App) addProjectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	groupsDir, groupsPage, projectsSort, projectsDir, projectsPage,
-		employeesSort, employeesDir, employeesPage, employeesGroupID := configParamsFromQuery(r)
+		employeesSort, employeesDir, employeesPage, employeesGroupID, projectsSearch := configParamsFromQuery(r)
 	employeesSearch := normalizeEmployeesSearch(r.URL.Query().Get("employees_search"))
 	name := strings.TrimSpace(r.FormValue("name"))
 	code := strings.TrimSpace(r.FormValue("code"))
@@ -27,7 +26,7 @@ func (a *App) addProjectHandler(w http.ResponseWriter, r *http.Request) {
 	reRenderWithError := func(errMsg string) {
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,
@@ -66,6 +65,7 @@ func (a *App) addProjectHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID, employeesSearch,
+			projectsSearch,
 		), http.StatusSeeOther)
 	case errors.Is(err, errDuplicateProjectCode):
 		auditFail(r, user, "create", target, "duplicate_code")
@@ -76,7 +76,6 @@ func (a *App) addProjectHandler(w http.ResponseWriter, r *http.Request) {
 		reRenderWithError("Не удалось сохранить проект")
 	}
 }
-
 func (a *App) editProjectHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -88,7 +87,7 @@ func (a *App) editProjectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	groupsDir, groupsPage, projectsSort, projectsDir, projectsPage,
-		employeesSort, employeesDir, employeesPage, employeesGroupID := configParamsFromQuery(r)
+		employeesSort, employeesDir, employeesPage, employeesGroupID, projectsSearch := configParamsFromQuery(r)
 	employeesSearch := normalizeEmployeesSearch(r.URL.Query().Get("employees_search"))
 	idStr := strings.TrimSpace(r.FormValue("id"))
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -96,7 +95,7 @@ func (a *App) editProjectHandler(w http.ResponseWriter, r *http.Request) {
 		auditFail(r, user, "update", "project(id="+idStr+")", "invalid_id")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,
@@ -111,7 +110,7 @@ func (a *App) editProjectHandler(w http.ResponseWriter, r *http.Request) {
 	reRenderWithEdit := func(errMsg string) {
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,
@@ -149,6 +148,7 @@ func (a *App) editProjectHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID, employeesSearch,
+			projectsSearch,
 		), http.StatusSeeOther)
 	case errors.Is(err, errDuplicateProjectCode):
 		auditFail(r, user, "update", target, "duplicate_code")
@@ -157,7 +157,7 @@ func (a *App) editProjectHandler(w http.ResponseWriter, r *http.Request) {
 		auditFail(r, user, "update", target, "not_found")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,
@@ -170,7 +170,6 @@ func (a *App) editProjectHandler(w http.ResponseWriter, r *http.Request) {
 		reRenderWithEdit("Не удалось сохранить изменения")
 	}
 }
-
 func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -182,7 +181,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	groupsDir, groupsPage, projectsSort, projectsDir, projectsPage,
-		employeesSort, employeesDir, employeesPage, employeesGroupID := configParamsFromQuery(r)
+		employeesSort, employeesDir, employeesPage, employeesGroupID, projectsSearch := configParamsFromQuery(r)
 	employeesSearch := normalizeEmployeesSearch(r.URL.Query().Get("employees_search"))
 	idStr := strings.TrimSpace(r.FormValue("id"))
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -190,7 +189,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 		auditFail(r, user, "delete", "project(id="+idStr+")", "invalid_id")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,
@@ -205,7 +204,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 			auditFail(r, user, "delete", targetProject(id, "", ""), "not_found")
 			a.renderConfigPageWith(w, user,
 				groupsDir, groupsPage,
-				projectsSort, projectsDir, projectsPage,
+				projectsSort, projectsDir, projectsPage, projectsSearch,
 				employeesSort, employeesDir, employeesPage,
 				employeesGroupID,
 				employeesSearch,
@@ -218,7 +217,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 		auditFailF(r, user, "delete", targetProject(id, "", ""), "db_error: %v", err)
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,
@@ -237,12 +236,13 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID, employeesSearch,
+			projectsSearch,
 		), http.StatusSeeOther)
 	case errors.Is(err, errProjectHasWorkEntries):
 		auditFail(r, user, "delete", target, "has_work_entries")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,
@@ -253,7 +253,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 		auditFail(r, user, "delete", target, "not_found")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,
@@ -265,7 +265,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 		auditFailF(r, user, "delete", target, "db_error: %v", err)
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,

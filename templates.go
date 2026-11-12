@@ -126,6 +126,7 @@ type ConfigPageData struct {
 	ProjectsPage       int
 	ProjectsTotalPages int
 	ProjectsTotal      int
+	ProjectsSearch     string
 
 	EmployeesPage       int
 	EmployeesTotalPages int

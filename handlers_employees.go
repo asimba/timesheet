@@ -10,7 +10,6 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 )
-
 func (a *App) addEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -22,7 +21,7 @@ func (a *App) addEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	groupsDir, groupsPage, projectsSort, projectsDir, projectsPage,
-		employeesSort, employeesDir, employeesPage, employeesGroupID := configParamsFromQuery(r)
+		employeesSort, employeesDir, employeesPage, employeesGroupID, projectsSearch := configParamsFromQuery(r)
 	employeesSearch := normalizeEmployeesSearch(r.URL.Query().Get("employees_search"))
 	login := strings.TrimSpace(r.FormValue("login"))
 	password := r.FormValue("password")
@@ -34,7 +33,7 @@ func (a *App) addEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	reRenderWithAdd := func(errMsg string) {
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,
@@ -120,6 +119,7 @@ func (a *App) addEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID, employeesSearch,
+			projectsSearch,
 		), http.StatusSeeOther)
 	case errors.Is(err, errDuplicateLogin):
 		auditFail(r, user, "create", target, "duplicate_login")
@@ -133,7 +133,6 @@ func (a *App) addEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		reRenderWithAdd("Не удалось сохранить сотрудника")
 	}
 }
-
 func (a *App) addEmployee(e Employee, password string) error {
 	ok, err := groupExists(a.db, e.GroupID)
 	if err != nil {
@@ -161,7 +160,6 @@ func (a *App) addEmployee(e Employee, password string) error {
 	}
 	return nil
 }
-
 func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -173,7 +171,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	groupsDir, groupsPage, projectsSort, projectsDir, projectsPage,
-		employeesSort, employeesDir, employeesPage, employeesGroupID := configParamsFromQuery(r)
+		employeesSort, employeesDir, employeesPage, employeesGroupID, projectsSearch := configParamsFromQuery(r)
 	employeesSearch := normalizeEmployeesSearch(r.URL.Query().Get("employees_search"))
 	idStr := strings.TrimSpace(r.FormValue("id"))
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -181,7 +179,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		auditFail(r, user, "update", "employee(id="+idStr+")", "invalid_id")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,
@@ -201,7 +199,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			auditFail(r, user, "update", targetEmployee(id, ""), "not_found")
 			a.renderConfigPageWith(w, user,
 				groupsDir, groupsPage,
-				projectsSort, projectsDir, projectsPage,
+				projectsSort, projectsDir, projectsPage, projectsSearch,
 				employeesSort, employeesDir, employeesPage,
 				employeesGroupID,
 				employeesSearch,
@@ -214,7 +212,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		auditFailF(r, user, "update", targetEmployee(id, ""), "db_error: %v", gerr)
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,
@@ -227,7 +225,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	reRenderWithEdit := func(errMsg string) {
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,
@@ -304,6 +302,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID, employeesSearch,
+			projectsSearch,
 		), http.StatusSeeOther)
 	case errors.Is(err, errGroupNotFound):
 		auditFail(r, user, "update", target, "group_not_found")
@@ -312,7 +311,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		auditFail(r, user, "update", target, "not_found")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,
@@ -325,7 +324,6 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		reRenderWithEdit("Не удалось сохранить изменения")
 	}
 }
-
 func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -337,7 +335,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	groupsDir, groupsPage, projectsSort, projectsDir, projectsPage,
-		employeesSort, employeesDir, employeesPage, employeesGroupID := configParamsFromQuery(r)
+		employeesSort, employeesDir, employeesPage, employeesGroupID, projectsSearch := configParamsFromQuery(r)
 	employeesSearch := normalizeEmployeesSearch(r.URL.Query().Get("employees_search"))
 	idStr := strings.TrimSpace(r.FormValue("id"))
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -345,7 +343,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		auditFail(r, user, "delete", "employee(id="+idStr+")", "invalid_id")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,
@@ -360,7 +358,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			auditFail(r, user, "delete", targetEmployee(id, ""), "not_found")
 			a.renderConfigPageWith(w, user,
 				groupsDir, groupsPage,
-				projectsSort, projectsDir, projectsPage,
+				projectsSort, projectsDir, projectsPage, projectsSearch,
 				employeesSort, employeesDir, employeesPage,
 				employeesGroupID,
 				employeesSearch,
@@ -373,7 +371,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		auditFailF(r, user, "delete", targetEmployee(id, ""), "db_error: %v", gerr)
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,
@@ -392,12 +390,13 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			projectsSort, projectsDir, projectsPage,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID, employeesSearch,
+			projectsSearch,
 		), http.StatusSeeOther)
 	case errors.Is(err, errEmployeeNotFound):
 		auditFail(r, user, "delete", target, "not_found")
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,
@@ -409,7 +408,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		auditFailF(r, user, "delete", target, "db_error: %v", err)
 		a.renderConfigPageWith(w, user,
 			groupsDir, groupsPage,
-			projectsSort, projectsDir, projectsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
 			employeesGroupID,
 			employeesSearch,
@@ -418,7 +417,6 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			})
 	}
 }
-
 func parseOrZero(s string) int64 {
 	n, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
@@ -426,7 +424,6 @@ func parseOrZero(s string) int64 {
 	}
 	return n
 }
-
 func (a *App) generatePasswordHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -461,7 +458,6 @@ func (a *App) generatePasswordHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("ошибка сериализации пароля в JSON: %v", err)
 	}
 }
-
 func (a *App) nextEmployeeIDHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {

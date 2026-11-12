@@ -7,13 +7,11 @@ import (
 	"strconv"
 	"strings"
 )
-
 const (
 	groupsPerPage    = 10
 	projectsPerPage  = 10
 	employeesPerPage = 10
 )
-
 func (a *App) configPageHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -25,6 +23,7 @@ func (a *App) configPageHandler(w http.ResponseWriter, r *http.Request) {
 	projectsSort := normalizeProjectsSort(r.URL.Query().Get("projects_sort"))
 	projectsDir := normalizeProjectsDir(r.URL.Query().Get("projects_dir"))
 	projectsPage := normalizeProjectsPage(r.URL.Query().Get("projects_page"))
+	projectsSearch := normalizeProjectsSearch(r.URL.Query().Get("projects_search"))
 	employeesSort := normalizeEmployeesSort(r.URL.Query().Get("employees_sort"))
 	employeesDir := normalizeEmployeesDir(r.URL.Query().Get("employees_dir"))
 	employeesPage := normalizeEmployeesPage(r.URL.Query().Get("employees_page"))
@@ -35,7 +34,7 @@ func (a *App) configPageHandler(w http.ResponseWriter, r *http.Request) {
 		a.writeGroupsPartial(w, groupsDir, groupsPage)
 		return
 	case "projects":
-		a.writeProjectsPartial(w, projectsSort, projectsDir, projectsPage)
+		a.writeProjectsPartial(w, projectsSort, projectsDir, projectsPage, projectsSearch)
 		return
 	case "employees":
 		a.writeEmployeesPartial(w, employeesSort, employeesDir, employeesPage, employeesGroupID, employeesSearch)
@@ -43,13 +42,12 @@ func (a *App) configPageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	a.renderConfigPageWith(w, user,
 		groupsDir, groupsPage,
-		projectsSort, projectsDir, projectsPage,
+		projectsSort, projectsDir, projectsPage, projectsSearch,
 		employeesSort, employeesDir, employeesPage,
 		employeesGroupID,
 		employeesSearch,
 		nil)
 }
-
 func paginateGroups(all []Group, page int) (pageItems []Group, totalPages, total int) {
 	total = len(all)
 	if total == 0 {
@@ -69,7 +67,6 @@ func paginateGroups(all []Group, page int) (pageItems []Group, totalPages, total
 	}
 	return all[start:end], totalPages, total
 }
-
 func paginateProjects(all []Project, page int) (pageItems []Project, totalPages, total int) {
 	total = len(all)
 	if total == 0 {
@@ -89,7 +86,6 @@ func paginateProjects(all []Project, page int) (pageItems []Project, totalPages,
 	}
 	return all[start:end], totalPages, total
 }
-
 func paginateEmployees(all []Employee, page int) (pageItems []Employee, totalPages, total int) {
 	total = len(all)
 	if total == 0 {
@@ -109,7 +105,6 @@ func paginateEmployees(all []Employee, page int) (pageItems []Employee, totalPag
 	}
 	return all[start:end], totalPages, total
 }
-
 func effectivePage(page, totalPages int) int {
 	if totalPages == 0 {
 		return 1
@@ -122,7 +117,6 @@ func effectivePage(page, totalPages int) int {
 	}
 	return page
 }
-
 func (a *App) writeGroupsPartial(w http.ResponseWriter, groupsDir string, groupsPage int) {
 	all, err := listGroups(a.db, groupsDir)
 	if err != nil {
@@ -159,9 +153,8 @@ func (a *App) writeGroupsPartial(w http.ResponseWriter, groupsDir string, groups
 		log.Printf("ошибка сериализации групп в JSON: %v", err)
 	}
 }
-
-func (a *App) writeProjectsPartial(w http.ResponseWriter, projectsSort, projectsDir string, projectsPage int) {
-	all, err := listProjects(a.db, projectsSort, projectsDir)
+func (a *App) writeProjectsPartial(w http.ResponseWriter, projectsSort, projectsDir string, projectsPage int, projectsSearch string) {
+	all, err := listProjects(a.db, projectsSort, projectsDir, projectsSearch)
 	if err != nil {
 		log.Printf("ошибка чтения проектов: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -170,27 +163,35 @@ func (a *App) writeProjectsPartial(w http.ResponseWriter, projectsSort, projects
 	items, totalPages, total := paginateProjects(all, projectsPage)
 	page := effectivePage(projectsPage, totalPages)
 	type projectJSON struct {
-		ID   int64  `json:"id"`
-		Name string `json:"name"`
-		Code string `json:"code"`
+		ID               int64  `json:"id"`
+		Name             string `json:"name"`
+		Code             string `json:"code"`
+		WorkEntriesCount int64  `json:"work_entries_count"`
 	}
 	resp := struct {
-		Projects     []projectJSON `json:"projects"`
-		ProjectsSort string        `json:"projects_sort"`
-		ProjectsDir  string        `json:"projects_dir"`
-		ProjectsPage int           `json:"projects_page"`
-		TotalPages   int           `json:"projects_total_pages"`
-		Total        int           `json:"projects_total"`
+		Projects       []projectJSON `json:"projects"`
+		ProjectsSort   string        `json:"projects_sort"`
+		ProjectsDir    string        `json:"projects_dir"`
+		ProjectsPage   int           `json:"projects_page"`
+		TotalPages     int           `json:"projects_total_pages"`
+		Total          int           `json:"projects_total"`
+		ProjectsSearch string        `json:"projects_search"`
 	}{
-		Projects:     make([]projectJSON, 0, len(items)),
-		ProjectsSort: projectsSort,
-		ProjectsDir:  projectsDir,
-		ProjectsPage: page,
-		TotalPages:   totalPages,
-		Total:        total,
+		Projects:       make([]projectJSON, 0, len(items)),
+		ProjectsSort:   projectsSort,
+		ProjectsDir:    projectsDir,
+		ProjectsPage:   page,
+		TotalPages:     totalPages,
+		Total:          total,
+		ProjectsSearch: projectsSearch,
 	}
 	for _, p := range items {
-		resp.Projects = append(resp.Projects, projectJSON{ID: p.ID, Name: p.Name, Code: p.Code})
+		resp.Projects = append(resp.Projects, projectJSON{
+			ID:               p.ID, 
+			Name:             p.Name, 
+			Code:             p.Code,
+			WorkEntriesCount: p.WorkEntriesCount,
+		})
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
@@ -198,7 +199,6 @@ func (a *App) writeProjectsPartial(w http.ResponseWriter, projectsSort, projects
 		log.Printf("ошибка сериализации проектов в JSON: %v", err)
 	}
 }
-
 func (a *App) writeEmployeesPartial(w http.ResponseWriter, employeesSort, employeesDir string, employeesPage int, employeesGroupID int64, employeesSearch string) {
 	all, err := listEmployees(a.db, employeesSort, employeesDir, employeesGroupID, employeesSearch)
 	if err != nil {
@@ -255,36 +255,33 @@ func (a *App) writeEmployeesPartial(w http.ResponseWriter, employeesSort, employ
 		log.Printf("ошибка сериализации сотрудников в JSON: %v", err)
 	}
 }
-
 func normalizeGroupsDir(dir string) string {
 	if dir != "desc" {
 		return "asc"
 	}
 	return "desc"
 }
-
 func normalizeGroupsPage(p string) int {
 	return normalizePage(p)
 }
-
 func normalizeProjectsSort(field string) string {
 	if field != "code" {
 		return "name"
 	}
 	return "code"
 }
-
 func normalizeProjectsDir(dir string) string {
 	if dir != "desc" {
 		return "asc"
 	}
 	return "desc"
 }
-
 func normalizeProjectsPage(p string) int {
 	return normalizePage(p)
 }
-
+func normalizeProjectsSearch(s string) string {
+	return strings.TrimSpace(s)
+}
 func normalizeEmployeesSort(field string) string {
 	switch field {
 	case "last_name", "group_name":
@@ -292,18 +289,15 @@ func normalizeEmployeesSort(field string) string {
 	}
 	return "login"
 }
-
 func normalizeEmployeesDir(dir string) string {
 	if dir != "desc" {
 		return "asc"
 	}
 	return "desc"
 }
-
 func normalizeEmployeesPage(p string) int {
 	return normalizePage(p)
 }
-
 func normalizeEmployeesGroupID(p string) int64 {
 	if p == "" {
 		return 0
@@ -314,11 +308,9 @@ func normalizeEmployeesGroupID(p string) int64 {
 	}
 	return n
 }
-
 func normalizeEmployeesSearch(s string) string {
 	return strings.TrimSpace(s)
 }
-
 func normalizePage(p string) int {
 	if p == "" {
 		return 1
@@ -338,11 +330,10 @@ func normalizePage(p string) int {
 	}
 	return n
 }
-
 func (a *App) renderConfigPage(w http.ResponseWriter, user, groupErr, employeeErr string) {
 	a.renderConfigPageWith(w, user,
 		"asc", 1,
-		"name", "asc", 1,
+		"name", "asc", 1, "",
 		"login", "asc", 1,
 		0,
 		"",
@@ -351,11 +342,10 @@ func (a *App) renderConfigPage(w http.ResponseWriter, user, groupErr, employeeEr
 			d.EmployeeError = employeeErr
 		})
 }
-
 func (a *App) renderConfigPageWithPageError(w http.ResponseWriter, user, pageErr string) {
 	a.renderConfigPageWith(w, user,
 		"asc", 1,
-		"name", "asc", 1,
+		"name", "asc", 1, "",
 		"login", "asc", 1,
 		0,
 		"",
@@ -363,11 +353,10 @@ func (a *App) renderConfigPageWithPageError(w http.ResponseWriter, user, pageErr
 			d.PageError = pageErr
 		})
 }
-
 func (a *App) renderConfigPageWith(
 	w http.ResponseWriter,
 	user, groupsDir string, groupsPage int,
-	projectsSort, projectsDir string, projectsPage int,
+	projectsSort, projectsDir string, projectsPage int, projectsSearch string,
 	employeesSort, employeesDir string, employeesPage int,
 	employeesGroupID int64,
 	employeesSearch string,
@@ -381,7 +370,7 @@ func (a *App) renderConfigPageWith(
 	}
 	groups, groupsTotalPages, groupsTotal := paginateGroups(allGroups, groupsPage)
 	groupsPage = effectivePage(groupsPage, groupsTotalPages)
-	allProjects, err := listProjects(a.db, projectsSort, projectsDir)
+	allProjects, err := listProjects(a.db, projectsSort, projectsDir, projectsSearch)
 	if err != nil {
 		log.Printf("ошибка чтения проектов: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -412,6 +401,7 @@ func (a *App) renderConfigPageWith(
 		ProjectsPage:        projectsPage,
 		ProjectsTotalPages:  projectsTotalPages,
 		ProjectsTotal:       projectsTotal,
+		ProjectsSearch:      projectsSearch,
 		EmployeesSort:       employeesSort,
 		EmployeesDir:        employeesDir,
 		EmployeesPage:       employeesPage,
