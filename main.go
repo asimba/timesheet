@@ -114,7 +114,8 @@ func main() {
 		log.Printf("Резервирование БД: dir=%s каждые %d мин (хранить %d последних)",
 			cfg.BackupDir, cfg.BackupIntervalMinutes, cfg.BackupKeep)
 	}
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	handler := gzipMiddleware(mux)
+	if err := http.ListenAndServe(addr, handler); err != nil {
 		stopBackup()
 		log.Fatal(err)
 	}
