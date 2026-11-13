@@ -950,9 +950,35 @@ func buildGroupStatsSheetXML(group *Group, worksMonth string, entries []WorkEntr
 		rowNum++
 		idx++
 	}
+	totalRow := rowNum
+	totalDuration := int64(0)
+	for _, k := range keys {
+		totalDuration += agg[k].duration
+	}
+	fmt.Fprintf(&b, `<row r="%d">`, totalRow)
+	fmt.Fprintf(&b, `<c r="A%d" t="inlineStr" s="3"><is><t xml:space="preserve">%s</t></is></c>`,
+		totalRow, xmlEscape("Общая длительность работ"))
+	fmt.Fprintf(&b, `<c r="B%d" s="3"/>`, totalRow)
+	totalDurVal := float64(totalDuration) / 1440.0
+	if len(entries) > 0 {
+		fmt.Fprintf(&b, `<c r="C%d" s="10"><f>SUM(C6:C%d)</f><v>%s</v></c>`,
+			totalRow, totalRow-1, strconv.FormatFloat(totalDurVal, 'f', -1, 64))
+	} else {
+		fmt.Fprintf(&b, `<c r="C%d" s="10"><v>0</v></c>`, totalRow)
+	}
+	totalShiftVal := float64(totalDuration) / 480.0
+	if len(entries) > 0 {
+		fmt.Fprintf(&b, `<c r="D%d" s="12"><f>C%d*1440/480</f><v>%s</v></c>`,
+			totalRow, totalRow, strconv.FormatFloat(totalShiftVal, 'f', -1, 64))
+	} else {
+		fmt.Fprintf(&b, `<c r="D%d" s="12"><v>0</v></c>`, totalRow)
+	}
+	fmt.Fprintf(&b, `<c r="E%d" s="0"/>`, totalRow)
+	b.WriteString(`</row>`)
 	b.WriteString(`</sheetData>`)
-	b.WriteString(`<mergeCells count="1">`)
+	b.WriteString(`<mergeCells count="2">`)
 	b.WriteString(`<mergeCell ref="A1:E1"/>`)
+	fmt.Fprintf(&b, `<mergeCell ref="A%d:B%d"/>`, totalRow, totalRow)
 	b.WriteString(`</mergeCells>`)
 	b.WriteString(`</worksheet>`)
 	return b.String()
@@ -1023,11 +1049,36 @@ func buildEmployeeStatsSheetXML(groupName, worksMonth string, entries []WorkEntr
 		rowNum++
 		idx++
 	}
+	totalRow := rowNum
+	totalDuration := int64(0)
+	for _, k := range keys {
+		totalDuration += agg[k].duration
+	}
+	fmt.Fprintf(&b, `<row r="%d">`, totalRow)
+	fmt.Fprintf(&b, `<c r="A%d" t="inlineStr" s="3"><is><t xml:space="preserve">%s</t></is></c>`,
+		totalRow, xmlEscape("Общая длительность работ"))
+	fmt.Fprintf(&b, `<c r="B%d" s="3"/>`, totalRow)
+	totalDurVal := float64(totalDuration) / 1440.0
+	if len(entries) > 0 {
+		fmt.Fprintf(&b, `<c r="C%d" s="10"><f>SUM(C6:C%d)</f><v>%s</v></c>`,
+			totalRow, totalRow-1, strconv.FormatFloat(totalDurVal, 'f', -1, 64))
+	} else {
+		fmt.Fprintf(&b, `<c r="C%d" s="10"><v>0</v></c>`, totalRow)
+	}
+	totalShiftVal := float64(totalDuration) / 480.0
+	if len(entries) > 0 {
+		fmt.Fprintf(&b, `<c r="D%d" s="12"><f>C%d*1440/480</f><v>%s</v></c>`,
+			totalRow, totalRow, strconv.FormatFloat(totalShiftVal, 'f', -1, 64))
+	} else {
+		fmt.Fprintf(&b, `<c r="D%d" s="12"><v>0</v></c>`, totalRow)
+	}
+	b.WriteString(`</row>`)
 	b.WriteString(`</sheetData>`)
-	b.WriteString(`<mergeCells count="3">`)
+	b.WriteString(`<mergeCells count="4">`)
 	b.WriteString(`<mergeCell ref="A1:D1"/>`)
 	b.WriteString(`<mergeCell ref="B2:C2"/>`)
 	b.WriteString(`<mergeCell ref="B3:C3"/>`)
+	fmt.Fprintf(&b, `<mergeCell ref="A%d:B%d"/>`, totalRow, totalRow)
 	b.WriteString(`</mergeCells>`)
 	b.WriteString(`</worksheet>`)
 	return b.String()
@@ -1407,8 +1458,10 @@ func buildIndividualEmployeeStatsSheetXML(groupName, empName, worksMonth string,
 	}
 	rowNum := 6
 	idx := 1
+	totalDuration := int64(0)
 	for _, k := range keys {
 		rd := agg[k]
+		totalDuration += rd.duration
 		fmt.Fprintf(&b, `<row r="%d">`, rowNum)
 		fmt.Fprintf(&b, `<c r="A%d" t="inlineStr" s="11"><is><t>%d</t></is></c>`, rowNum, idx)
 		projText := rd.projectName
@@ -1424,11 +1477,32 @@ func buildIndividualEmployeeStatsSheetXML(groupName, empName, worksMonth string,
 		rowNum++
 		idx++
 	}
+	totalRow := rowNum
+	fmt.Fprintf(&b, `<row r="%d">`, totalRow)
+	fmt.Fprintf(&b, `<c r="A%d" t="inlineStr" s="3"><is><t xml:space="preserve">%s</t></is></c>`,
+		totalRow, xmlEscape("Общая длительность работ"))
+	fmt.Fprintf(&b, `<c r="B%d" s="3"/>`, totalRow)
+	totalDurVal := float64(totalDuration) / 1440.0
+	if len(entries) > 0 {
+		fmt.Fprintf(&b, `<c r="C%d" s="10"><f>SUM(C6:C%d)</f><v>%s</v></c>`,
+			totalRow, totalRow-1, strconv.FormatFloat(totalDurVal, 'f', -1, 64))
+	} else {
+		fmt.Fprintf(&b, `<c r="C%d" s="10"><v>0</v></c>`, totalRow)
+	}
+	totalShiftVal := float64(totalDuration) / 480.0
+	if len(entries) > 0 {
+		fmt.Fprintf(&b, `<c r="D%d" s="12"><f>C%d*1440/480</f><v>%s</v></c>`,
+			totalRow, totalRow, strconv.FormatFloat(totalShiftVal, 'f', -1, 64))
+	} else {
+		fmt.Fprintf(&b, `<c r="D%d" s="12"><v>0</v></c>`, totalRow)
+	}
+	b.WriteString(`</row>`)
 	b.WriteString(`</sheetData>`)
-	b.WriteString(`<mergeCells count="3">`)
+	b.WriteString(`<mergeCells count="4">`)
 	b.WriteString(`<mergeCell ref="B1:C1"/>`)
 	b.WriteString(`<mergeCell ref="B2:C2"/>`)
 	b.WriteString(`<mergeCell ref="B3:C3"/>`)
+	fmt.Fprintf(&b, `<mergeCell ref="A%d:B%d"/>`, totalRow, totalRow)
 	b.WriteString(`</mergeCells>`)
 	b.WriteString(`</worksheet>`)
 	return b.String()
