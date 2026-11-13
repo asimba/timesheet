@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 )
 
 type Role string
@@ -19,6 +20,7 @@ type Session struct {
 	User       string
 	Role       Role
 	EmployeeID int64
+	ExpiresAt  time.Time
 }
 
 var (
@@ -34,8 +36,10 @@ func newToken() string {
 	return hex.EncodeToString(b)
 }
 
-func setSession(w http.ResponseWriter, s Session) {
+func setSession(w http.ResponseWriter, s Session, maxAge int) {
 	token := newToken()
+	ttl := time.Duration(maxAge) * time.Second
+	s.ExpiresAt = time.Now().Add(ttl)
 	sessionsMu.Lock()
 	sessions[token] = s
 	sessionsMu.Unlock()
@@ -45,24 +49,51 @@ func setSession(w http.ResponseWriter, s Session) {
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   3600,
+		MaxAge:   maxAge,
 	})
 }
 
-func currentSession(r *http.Request) (Session, bool) {
+func currentSession(w http.ResponseWriter, r *http.Request, maxAge int) (Session, bool) {
 	c, err := r.Cookie("session")
 	if err != nil {
 		return Session{}, false
 	}
-	sessionsMu.RLock()
+	sessionsMu.Lock()
 	s, ok := sessions[c.Value]
-	sessionsMu.RUnlock()
-	return s, ok
+	if ok && time.Now().After(s.ExpiresAt) {
+		delete(sessions, c.Value)
+		ok = false
+	}
+	if ok {
+		ttl := time.Duration(maxAge) * time.Second
+		s.ExpiresAt = time.Now().Add(ttl)
+		sessions[c.Value] = s
+	}
+	sessionsMu.Unlock()
+	if !ok {
+		return Session{}, false
+	}
+	log.Printf("[AUDIT] ip=%s user=%s action=extend_session target=session result=ok", clientIP(r), s.User)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    c.Value,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   maxAge,
+	})
+	return s, true
 }
 
 func currentUser(r *http.Request) (string, bool) {
-	s, ok := currentSession(r)
-	if !ok {
+	c, err := r.Cookie("session")
+	if err != nil {
+		return "", false
+	}
+	sessionsMu.RLock()
+	s, ok := sessions[c.Value]
+	sessionsMu.RUnlock()
+	if !ok || time.Now().After(s.ExpiresAt) {
 		return "", false
 	}
 	return s.User, true

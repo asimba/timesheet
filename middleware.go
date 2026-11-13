@@ -6,7 +6,7 @@ import (
 
 func (a *App) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := currentSession(r); !ok {
+		if _, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60); !ok {
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
@@ -16,7 +16,7 @@ func (a *App) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 
 func (a *App) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		s, ok := currentSession(r)
+		s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
 		if !ok {
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return

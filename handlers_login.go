@@ -10,7 +10,7 @@ import (
 
 func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		if s, ok := currentSession(r); ok {
+		if s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60); ok {
 			redirectByRole(w, r, s.Role)
 			return
 		}
@@ -39,7 +39,7 @@ func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, admin := range a.cfg.Admins {
 		if username == admin.User && password == admin.Password {
-			setSession(w, Session{User: admin.User, Role: RoleAdmin})
+			setSession(w, Session{User: admin.User, Role: RoleAdmin}, a.cfg.SessionTTLMinutes*60)
 			auditOK(r, admin.User, "login", "session role=admin")
 			http.Redirect(w, r, "/config", http.StatusSeeOther)
 			return
@@ -74,7 +74,7 @@ func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	setSession(w, Session{User: emp.Login, Role: RoleEmployee, EmployeeID: emp.ID})
+	setSession(w, Session{User: emp.Login, Role: RoleEmployee, EmployeeID: emp.ID}, a.cfg.SessionTTLMinutes*60)
 	auditOK(r, emp.Login, "login", "session role=employee")
 	http.Redirect(w, r, "/timesheets", http.StatusSeeOther)
 }

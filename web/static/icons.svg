@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+<symbol id="icon-book" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a2 2 0 0 1 2 2v8a1.5 1.5 0 0 0-1.5-1.5H2z"/><path d="M14 3H8a2 2 0 0 0-2 2v8a1.5 1.5 0 0 1 1.5-1.5H14z"/></g></symbol>
+<symbol id="icon-logout" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2H3.5A1.5 1.5 0 0 0 2 3.5v9A1.5 1.5 0 0 0 3.5 14H6"/><path d="M10.5 11l3-3-3-3"/><path d="M13.5 8H6"/></g></symbol>
+<symbol id="icon-download" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8"/><path d="M5 7l3 3 3-3"/><path d="M3 13h10"/></g></symbol>
+<symbol id="icon-chart" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13V9M6 13V5M10 13V7M14 13V3"/></g></symbol>
+<symbol id="icon-users" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14v-2a4 4 0 0 0-4-4H4a4 4 0 0 0-4 4v2"/><circle cx="6" cy="4" r="3"/><path d="M14 14v-2a4 4 0 0 0-3-3.87"/><path d="M12 4a3 3 0 0 1 0 5.5"/></g></symbol>
+<symbol id="icon-edit" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/></g></symbol>
+<symbol id="icon-trash" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5L11 4M7 7v4M9 7v4"/></g></symbol>
+<symbol id="icon-calendar" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="11" rx="1"/><path d="M2 6h12M5 2v2M11 2v2M5 9h2M9 9h2M5 12h2M9 12h2"/></g></symbol>
+<symbol id="icon-lock" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></g></symbol>
+<symbol id="icon-key" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M8 10v4M2 8h4M10 8h4M4 4l3 3M12 12l-3-3M4 12l3-3M12 4l-3 3"/></g></symbol>
+</svg>

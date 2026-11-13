@@ -12,17 +12,10 @@
 <p class="subtitle">
 <span>Пользователь: <span class="username">{{.Username}}</span></span>
 <a class="logout-icon-btn" href="/static/admin-guide.html" target="_blank" rel="noopener" title="Руководство администратора" aria-label="Руководство администратора">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M2 3h6a2 2 0 0 1 2 2v8a1.5 1.5 0 0 0-1.5-1.5H2z"/>
-<path d="M14 3H8a2 2 0 0 0-2 2v8a1.5 1.5 0 0 1 1.5-1.5H14z"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-book"/></svg>
 </a>
 <button type="button" class="logout-icon-btn" id="openLogoutModalBtn" title="Выйти" aria-label="Выйти">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M6 2H3.5A1.5 1.5 0 0 0 2 3.5v9A1.5 1.5 0 0 0 3.5 14H6"/>
-<path d="M10.5 11l3-3-3-3"/>
-<path d="M13.5 8H6"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-logout"/></svg>
 </button>
 </p>
 <div id="pageErrorMessage" hidden>{{.PageError}}</div>
@@ -35,11 +28,7 @@
 <div class="actions">
 <button type="button" class="btn" id="openGroupModalBtn">Добавить группу/отдел</button>
 <button type="button" class="icon-btn icon-btn--match-btn" id="openGroupsExportModalBtn" title="Экспорт списка отделов" aria-label="Экспорт списка отделов">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M8 2v8"/>
-<path d="M5 7l3 3 3-3"/>
-<path d="M3 13h10"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-download"/></svg>
 </button>
 </div>
 {{if .Groups}}
@@ -69,17 +58,10 @@ title="Сортировка по наименованию">
 </td>
 <td class="actions-col">
 <button type="button" class="icon-btn stats-btn" data-action="stats-group" data-id="{{$g.ID}}" data-name="{{$g.Name}}" title="Статистика по объектам" aria-label="Статистика по объектам">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M2 13V9M6 13V5M10 13V7M14 13V3"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-chart"/></svg>
 </button>
 <button type="button" class="icon-btn" data-action="stats-employees" data-id="{{$g.ID}}" data-name="{{$g.Name}}" title="Статистика по сотрудникам" aria-label="Статистика по сотрудникам">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M10 14v-2a4 4 0 0 0-4-4H4a4 4 0 0 0-4 4v2"/>
-<circle cx="6" cy="4" r="3"/>
-<path d="M14 14v-2a4 4 0 0 0-3-3.87"/>
-<path d="M12 4a3 3 0 0 1 0 5.5"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-users"/></svg>
 </button>
 <button
 type="button"
@@ -88,17 +70,13 @@ data-action="edit-group"
 data-id="{{$g.ID}}"
 data-name="{{$g.Name}}"
 title="Изменить" aria-label="Изменить">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-edit"/></svg>
 </button>
 <form method="POST" action="/groups/delete?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&projects_search={{$.ProjectsSearch}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}&employees_search={{$.EmployeesSearch}}" class="inline-form"
 onsubmit="return confirm('Удалить группу {{$g.Name}}?');">
 <input type="hidden" name="id" value="{{$g.ID}}">
 <button type="submit" class="icon-btn danger" title="Удалить" aria-label="Удалить">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5L11 4M7 7v4M9 7v4"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-trash"/></svg>
 </button>
 </form>
 </td>
@@ -145,11 +123,7 @@ href="/config?groups_dir={{.GroupsDir}}&groups_page={{add .GroupsPage 1}}&projec
 <div class="actions">
 <button type="button" class="btn" id="openEmployeeModalBtn">Добавить сотрудника</button>
 <button type="button" class="icon-btn icon-btn--match-btn" id="openEmployeesExportModalBtn" title="Экспорт списка сотрудников" aria-label="Экспорт списка сотрудников">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M8 2v8"/>
-<path d="M5 7l3 3 3-3"/>
-<path d="M3 13h10"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-download"/></svg>
 </button>
 </div>
 <div class="field" style="margin-bottom: 16px;">
@@ -209,16 +183,11 @@ title="Сортировка по отделу">
 <span class="timesheet-link">
 <button type="button" class="timesheet-count timesheet-count-btn" data-action="stats-timesheet-emp" data-id="{{$e.ID}}" data-name="{{$e.LastName}} {{$e.FirstName}}" title="Экспорт табеля сотрудника" aria-label="Экспорт табеля сотрудника">({{$e.WorkEntriesCount}})</button>
 <a class="icon-btn" href="/timesheets?employee_id={{$e.ID}}" title="Табели" aria-label="Табели">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<rect x="2" y="3" width="12" height="11" rx="1"/>
-<path d="M2 6h12M5 2v2M11 2v2M5 9h2M9 9h2M5 12h2M9 12h2"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-calendar"/></svg>
 </a>
 </span>
 <button type="button" class="icon-btn" data-action="stats-individual-emp" data-id="{{$e.ID}}" data-name="{{$e.LastName}} {{$e.FirstName}}" title="Статистика" aria-label="Статистика">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M2 13V9M6 13V5M10 13V7M14 13V3"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-chart"/></svg>
 </button>
 <button
 type="button"
@@ -230,17 +199,13 @@ data-first-name="{{$e.FirstName}}"
 data-middle-name="{{$e.MiddleName}}"
 data-group-id="{{$e.GroupID}}"
 title="Изменить" aria-label="Изменить">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-edit"/></svg>
 </button>
 <form method="POST" action="/employees/delete?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&projects_search={{$.ProjectsSearch}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}&employees_search={{$.EmployeesSearch}}" class="inline-form"
 onsubmit="return confirm('Удалить сотрудника {{$e.Login}}?');">
 <input type="hidden" name="id" value="{{$e.ID}}">
 <button type="submit" class="icon-btn danger" title="Удалить" aria-label="Удалить">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5L11 4M7 7v4M9 7v4"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-trash"/></svg>
 </button>
 </form>
 </td>
@@ -287,11 +252,7 @@ href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sor
 <div class="actions">
 <button type="button" class="btn" id="openProjectModalBtn">Добавить объект/проект</button>
 <button type="button" class="icon-btn icon-btn--match-btn" id="openProjectsExportModalBtn" title="Экспорт списка объектов" aria-label="Экспорт списка объектов">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M8 2v8"/>
-<path d="M5 7l3 3 3-3"/>
-<path d="M3 13h10"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-download"/></svg>
 </button>
 </div>
 <div class="field" style="margin-bottom: 16px;">
@@ -330,9 +291,7 @@ title="Сортировка по коду">
 <td class="actions-col">
 <span class="project-count" title="Количество записей по объекту">({{$p.WorkEntriesCount}})</span>
 <button type="button" class="icon-btn" data-action="stats-project" data-id="{{$p.ID}}" data-name="{{$p.Name}}" title="Статистика по отделам" aria-label="Статистика по отделам">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M2 13V9M6 13V5M10 13V7M14 13V3"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-chart"/></svg>
 </button>
 <button
 type="button"
@@ -342,17 +301,13 @@ data-id="{{$p.ID}}"
 data-name="{{$p.Name}}"
 data-code="{{$p.Code}}"
 title="Изменить" aria-label="Изменить">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-edit"/></svg>
 </button>
 <form method="POST" action="/projects/delete?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&projects_search={{$.ProjectsSearch}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}&employees_search={{$.EmployeesSearch}}" class="inline-form"
 onsubmit="return confirm('Удалить проект {{$p.Code}}?');">
 <input type="hidden" name="id" value="{{$p.ID}}">
 <button type="submit" class="icon-btn danger" title="Удалить" aria-label="Удалить">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5L11 4M7 7v4M9 7v4"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-trash"/></svg>
 </button>
 </form>
 </td>
@@ -487,9 +442,7 @@ value="{{.AddLogin}}">
 <div class="input-with-icon">
 <input type="text" id="empPassword" name="password" required minlength="4" maxlength="100" autocomplete="new-password">
 <button type="button" class="icon-btn" id="genPasswordBtn" title="Сгенерировать пароль" aria-label="Сгенерировать пароль">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M8 2v4M8 10v4M2 8h4M10 8h4M4 4l3 3M12 12l-3-3M4 12l3-3M12 4l-3 3"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-key"/></svg>
 </button>
 </div>
 </div>
@@ -564,9 +517,7 @@ value="{{.AddMiddleName}}">
 <div class="input-with-icon">
 <input type="text" id="editEmpPassword" name="password" minlength="4" maxlength="100" autocomplete="new-password">
 <button type="button" class="icon-btn" id="genEditPasswordBtn" title="Сгенерировать пароль" aria-label="Сгенерировать пароль">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M8 2v4M8 10v4M2 8h4M10 8h4M4 4l3 3M12 12l-3-3M4 12l3-3M12 4l-3 3"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-key"/></svg>
 </button>
 </div>
 </div>
@@ -1216,7 +1167,7 @@ statsBtn.dataset.id = String(g.id);
 statsBtn.dataset.name = g.name;
 statsBtn.title = 'Статистика по объектам';
 statsBtn.setAttribute('aria-label', 'Статистика по объектам');
-statsBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 13V9M6 13V5M10 13V7M14 13V3"/></svg>';
+statsBtn.innerHTML = '<svg class="icon"><use href="/static/icons.svg#icon-chart"/></svg>';
 tdActions.appendChild(statsBtn);
 const empStatsBtn = document.createElement('button');
 empStatsBtn.type = 'button';
@@ -1226,7 +1177,7 @@ empStatsBtn.dataset.id = String(g.id);
 empStatsBtn.dataset.name = g.name;
 empStatsBtn.title = 'Статистика по сотрудникам';
 empStatsBtn.setAttribute('aria-label', 'Статистика по сотрудникам');
-empStatsBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14v-2a4 4 0 0 0-4-4H4a4 4 0 0 0-4 4v2"/><circle cx="6" cy="4" r="3"/><path d="M14 14v-2a4 4 0 0 0-3-3.87"/><path d="M12 4a3 3 0 0 1 0 5.5"/></svg>';
+empStatsBtn.innerHTML = '<svg class="icon"><use href="/static/icons.svg#icon-users"/></svg>';
 tdActions.appendChild(empStatsBtn);
 const editBtn = document.createElement('button');
 editBtn.type = 'button';
@@ -1236,7 +1187,7 @@ editBtn.setAttribute('aria-label', 'Изменить');
 editBtn.dataset.action = 'edit-group';
 editBtn.dataset.id = String(g.id);
 editBtn.dataset.name = g.name;
-editBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/></svg>';
+editBtn.innerHTML = '<svg class="icon"><use href="/static/icons.svg#icon-edit"/></svg>';
 editBtn.addEventListener('click', function () {
 document.getElementById('editGroupId').value = editBtn.dataset.id;
 document.getElementById('editGroupName').value = editBtn.dataset.name;
@@ -1259,7 +1210,7 @@ delBtn.type = 'submit';
 delBtn.className = 'icon-btn danger';
 delBtn.title = 'Удалить';
 delBtn.setAttribute('aria-label', 'Удалить');
-delBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5L11 4M7 7v4M9 7v4"/></svg>';
+delBtn.innerHTML = '<svg class="icon"><use href="/static/icons.svg#icon-trash"/></svg>';
 form.appendChild(delBtn);
 tdActions.appendChild(form);
 tr.appendChild(tdActions);
@@ -1451,7 +1402,7 @@ tabBtn.className = 'icon-btn';
 tabBtn.href = '/timesheets?employee_id=' + encodeURIComponent(e.id);
 tabBtn.title = 'Табели';
 tabBtn.setAttribute('aria-label', 'Табели');
-tabBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="1"/><path d="M2 6h12M5 2v2M11 2v2M5 9h2M9 9h2M5 12h2M9 12h2"/></svg>';
+tabBtn.innerHTML = '<svg class="icon"><use href="/static/icons.svg#icon-calendar"/></svg>';
 tsWrap.appendChild(tabBtn);
 tdActions.appendChild(tsWrap);
 const indStatsBtn = document.createElement('button');
@@ -1462,7 +1413,7 @@ indStatsBtn.dataset.id = String(e.id);
 indStatsBtn.dataset.name = e.last_name + ' ' + e.first_name;
 indStatsBtn.title = 'Статистика';
 indStatsBtn.setAttribute('aria-label', 'Статистика');
-indStatsBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 13V9M6 13V5M10 13V7M14 13V3"/></svg>';
+indStatsBtn.innerHTML = '<svg class="icon"><use href="/static/icons.svg#icon-chart"/></svg>';
 tdActions.appendChild(indStatsBtn);
 const editBtn = document.createElement('button');
 editBtn.type = 'button';
@@ -1475,7 +1426,7 @@ editBtn.dataset.lastName = e.last_name;
 editBtn.dataset.firstName = e.first_name;
 editBtn.dataset.middleName = e.middle_name;
 editBtn.dataset.groupId = String(e.group_id);
-editBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/></svg>';
+editBtn.innerHTML = '<svg class="icon"><use href="/static/icons.svg#icon-edit"/></svg>';
 editBtn.addEventListener('click', function () {
 document.getElementById('editEmpId').value = editBtn.dataset.id;
 document.getElementById('editEmpLastName').value = editBtn.dataset.lastName;
@@ -1502,7 +1453,7 @@ delBtn.type = 'submit';
 delBtn.className = 'icon-btn danger';
 delBtn.title = 'Удалить';
 delBtn.setAttribute('aria-label', 'Удалить');
-delBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5L11 4M7 7v4M9 7v4"/></svg>';
+delBtn.innerHTML = '<svg class="icon"><use href="/static/icons.svg#icon-trash"/></svg>';
 form.appendChild(delBtn);
 tdActions.appendChild(form);
 tr.appendChild(tdActions);
@@ -1680,7 +1631,7 @@ projStatsBtn.dataset.id = String(p.id);
 projStatsBtn.dataset.name = p.name;
 projStatsBtn.title = 'Статистика по отделам';
 projStatsBtn.setAttribute('aria-label', 'Статистика по отделам');
-projStatsBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 13V9M6 13V5M10 13V7M14 13V3"/></svg>';
+projStatsBtn.innerHTML = '<svg class="icon"><use href="/static/icons.svg#icon-chart"/></svg>';
 projStatsBtn.addEventListener('click', function () {
 openProjectStatsModal(projStatsBtn.dataset.id, projStatsBtn.dataset.name);
 });
@@ -1694,7 +1645,7 @@ editBtn.dataset.action = 'edit-project';
 editBtn.dataset.id = String(p.id);
 editBtn.dataset.name = p.name;
 editBtn.dataset.code = p.code;
-editBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/></svg>';
+editBtn.innerHTML = '<svg class="icon"><use href="/static/icons.svg#icon-edit"/></svg>';
 editBtn.addEventListener('click', function () {
 document.getElementById('editProjectId').value = editBtn.dataset.id;
 document.getElementById('editProjectName').value = editBtn.dataset.name;
@@ -1718,7 +1669,7 @@ delBtn.type = 'submit';
 delBtn.className = 'icon-btn danger';
 delBtn.title = 'Удалить';
 delBtn.setAttribute('aria-label', 'Удалить');
-delBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5L11 4M7 7v4M9 7v4"/></svg>';
+delBtn.innerHTML = '<svg class="icon"><use href="/static/icons.svg#icon-trash"/></svg>';
 form.appendChild(delBtn);
 tdActions.appendChild(form);
 tr.appendChild(tdActions);

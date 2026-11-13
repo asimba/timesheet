@@ -4,45 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Руководство администратора — система учёта рабочего времени</title>
-<style>
-* { box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #2c3e50; background: #f4f7fb; margin: 0; padding: 0; line-height: 1.55; font-size: 15px; }
-.page { max-width: 860px; margin: 24px auto; background: #ffffff; padding: 40px 48px; border-radius: 6px; box-shadow: 0 2px 10px rgba(90, 115, 145, 0.08); }
-h1 { font-size: 24px; margin: 0 0 6px; color: #34495e; border-bottom: 2px solid #e3eaf2; padding-bottom: 10px; }
-.subtitle { color: #5a7391; font-size: 13px; margin: 0 0 24px; }
-h2 { font-size: 18px; margin: 28px 0 10px; color: #34495e; }
-h3 { font-size: 15px; margin: 18px 0 8px; color: #3f6ba0; }
-p { margin: 8px 0; }
-ul, ol { margin: 8px 0 8px 22px; padding: 0; }
-li { margin: 4px 0; }
-code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; background: #eef2f6; padding: 1px 5px; border-radius: 3px; font-size: 13px; color: #2c3e50; }
-pre { background: #f4f7fb; border: 1px solid #e3eaf2; border-radius: 4px; padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.45; color: #2c3e50; }
-pre code { background: transparent; padding: 0; font-size: inherit; }
-table { width: 100%; border-collapse: collapse; margin: 10px 0 14px; font-size: 14px; }
-th, td { border: 1px solid #e3eaf2; padding: 7px 10px; text-align: left; vertical-align: top; }
-th { background: #f4f7fb; color: #5a7391; font-weight: 600; }
-.note { background: #f4f7fb; border-left: 3px solid #7a9cc6; padding: 10px 14px; margin: 12px 0; border-radius: 3px; font-size: 14px; color: #3f5a7a; }
-.warn { background: #fdf6ec; border-left: 3px solid #d9a441; padding: 10px 14px; margin: 12px 0; border-radius: 3px; font-size: 14px; color: #7a5a1f; }
-.danger { background: #fdf2f1; border-left: 3px solid #c0392b; padding: 10px 14px; margin: 12px 0; border-radius: 3px; font-size: 14px; color: #8a2a1f; }
-.toc { background: #f4f7fb; border-radius: 4px; padding: 12px 16px; margin: 16px 0 24px; font-size: 14px; }
-.toc ol { margin: 6px 0 0 20px; }
-.toc a { color: #3f6ba0; text-decoration: none; }
-.toc a:hover { text-decoration: underline; }
-.footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid #e3eaf2; color: #8a9bb0; font-size: 12px; text-align: center; }
-@media print {
-body { background: #ffffff; font-size: 11pt; }
-.page { max-width: none; margin: 0; padding: 0; border-radius: 0; box-shadow: none; }
-h1 { font-size: 18pt; }
-h2 { font-size: 13pt; page-break-after: avoid; }
-h3 { font-size: 11pt; page-break-after: avoid; }
-pre, table, .note, .warn, .danger, .toc { page-break-inside: avoid; }
-a { color: inherit; text-decoration: none; }
-.footer { display: none; }
-}
-</style>
+<link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-<div class="page">
+<body class="guide-body">
+<div class="guide-page">
 <h1>Руководство администратора</h1>
 <p class="subtitle">Система учёта рабочего времени · для администратора</p>
 <div class="toc">
@@ -91,6 +56,7 @@ a { color: inherit; text-decoration: none; }
   "db_path": "base.db",
   "log_file": "service.log",
   "work_entries_edit_days": 5,
+  "session_ttl_minutes": 4320,
   "backup_dir": "backups",
   "backup_interval_minutes": 30,
   "backup_keep": 7,
@@ -106,6 +72,7 @@ a { color: inherit; text-decoration: none; }
 <tr><td><code>db_path</code></td><td>Путь к SQLite-базе</td><td><code>base.db</code></td></tr>
 <tr><td><code>log_file</code></td><td>Файл журнала (пусто — журнал в stderr)</td><td>—</td></tr>
 <tr><td><code>work_entries_edit_days</code></td><td>Сколько дней назад сотрудник может редактировать/удалять записи</td><td><code>5</code></td></tr>
+<tr><td><code>session_ttl_minutes</code></td><td>Время жизни сессии (логина) в минутах</td><td><code>4320</code> (3 суток)</td></tr>
 <tr><td><code>backup_dir</code></td><td>Каталог для резервных копий (пусто — бэкапы отключены)</td><td>—</td></tr>
 <tr><td><code>backup_interval_minutes</code></td><td>Интервал резервного копирования в минутах</td><td><code>60</code></td></tr>
 <tr><td><code>backup_keep</code></td><td>Сколько последних копий хранить</td><td><code>7</code></td></tr>
@@ -278,6 +245,7 @@ pgrep -f './app'</code></pre>
 [2026-11-06T10:00:00+03:00] резервирование БД: dir=backups interval=30m0s keep=7
 [2026-11-06T10:00:01+03:00] резервная копия БД создана: backups/base.20261106-100001.bak (32768 байт)
 [2026-11-06T10:12:34+03:00] [AUDIT] ip=192.168.0.55 user=admin action=login target=session result=ok
+[2026-11-06T10:13:10+03:00] [AUDIT] ip=192.168.0.55 user=admin action=extend_session target=session result=ok
 [2026-11-06T10:15:22+03:00] [AUDIT] ip=192.168.0.55 user=admin action=create target=employee(id=5, login="user5") result=ok
 [2026-11-06T10:18:44+03:00] [AUDIT] ip=192.168.0.55 user=admin action=delete target=employee(id=7, login="user7") work_entries=23 result=ok
 [2026-11-06T10:20:01+03:00] [AUDIT] ip=192.168.0.55 user=admin action=export_groups_xlsx target=groups(count=12) result=ok

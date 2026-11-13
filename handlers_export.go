@@ -13,8 +13,9 @@ import (
 	"strconv"
 	"strings"
 )
+
 func (a *App) exportTimesheetsHandler(w http.ResponseWriter, r *http.Request) {
-	s, ok := currentSession(r)
+	s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -104,8 +105,9 @@ func (a *App) exportTimesheetsHandler(w http.ResponseWriter, r *http.Request) {
 	auditOK(r, s.User, "export_timesheets",
 		targetEmployee(emp.ID, emp.Login)+" scope="+scope+" month="+worksMonth)
 }
+
 func (a *App) groupStatsExportHandler(w http.ResponseWriter, r *http.Request) {
-	s, ok := currentSession(r)
+	s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -187,8 +189,9 @@ func (a *App) groupStatsExportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	auditOK(r, s.User, "export_group_stats", targetGroup(group.ID, group.Name)+" scope="+scope)
 }
+
 func (a *App) employeeStatsExportHandler(w http.ResponseWriter, r *http.Request) {
-	s, ok := currentSession(r)
+	s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -266,8 +269,9 @@ func (a *App) employeeStatsExportHandler(w http.ResponseWriter, r *http.Request)
 	}
 	auditOK(r, s.User, "export_employee_stats", targetGroup(group.ID, group.Name)+" scope="+scope)
 }
+
 func (a *App) projectStatsExportHandler(w http.ResponseWriter, r *http.Request) {
-	s, ok := currentSession(r)
+	s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -358,26 +362,32 @@ func (a *App) projectStatsExportHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	auditOK(r, s.User, "export_project_stats", targetProject(project.ID, project.Name, project.Code)+" scope="+scope)
 }
+
 func buildTimesheetXLSX(emp *Employee, worksMonth string, entries []WorkEntry) ([]byte, error) {
 	return buildTimesheetXLSXSheets(emp, []sheetData{
 		{month: worksMonth, entries: entries},
 	})
 }
+
 type sheetData struct {
 	month   string
 	entries []WorkEntry
 }
+
 type groupSheetData struct {
 	month   string
 	entries []WorkEntry
 }
+
 type employeeSheetData struct {
 	month   string
 	entries []WorkEntry
 }
+
 func buildTimesheetXLSXAll(emp *Employee, sheets []sheetData) ([]byte, error) {
 	return buildTimesheetXLSXSheets(emp, sheets)
 }
+
 func buildTimesheetXLSXSheets(emp *Employee, sheets []sheetData) ([]byte, error) {
 	if len(sheets) == 0 {
 		sheets = []sheetData{{month: "", entries: nil}}
@@ -433,6 +443,7 @@ func buildTimesheetXLSXSheets(emp *Employee, sheets []sheetData) ([]byte, error)
 	}
 	return buf.Bytes(), nil
 }
+
 func buildGroupStatsXLSX(group *Group, sheets []groupSheetData) ([]byte, error) {
 	if len(sheets) == 0 {
 		sheets = []groupSheetData{{month: "", entries: nil}}
@@ -488,6 +499,7 @@ func buildGroupStatsXLSX(group *Group, sheets []groupSheetData) ([]byte, error) 
 	}
 	return buf.Bytes(), nil
 }
+
 func buildEmployeeStatsXLSX(groupName string, sheets []employeeSheetData) ([]byte, error) {
 	if len(sheets) == 0 {
 		sheets = []employeeSheetData{{month: "", entries: nil}}
@@ -543,6 +555,7 @@ func buildEmployeeStatsXLSX(groupName string, sheets []employeeSheetData) ([]byt
 	}
 	return buf.Bytes(), nil
 }
+
 func buildProjectStatsXLSX(project *Project, sheets []groupSheetData) ([]byte, error) {
 	if len(sheets) == 0 {
 		sheets = []groupSheetData{{month: "", entries: nil}}
@@ -580,6 +593,7 @@ func buildProjectStatsXLSX(project *Project, sheets []groupSheetData) ([]byte, e
 	}
 	return buf.Bytes(), nil
 }
+
 func colWidthFromMaxLen(maxLen int) float64 {
 	if maxLen <= 0 {
 		maxLen = 1
@@ -587,6 +601,7 @@ func colWidthFromMaxLen(maxLen int) float64 {
 	w := float64(maxLen)*1.2 + 2
 	return math.Round(w*100) / 100
 }
+
 func buildContentTypesXML(sheetCount int) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -601,6 +616,7 @@ func buildContentTypesXML(sheetCount int) string {
 	b.WriteString(`</Types>`)
 	return b.String()
 }
+
 func buildWorkbookXMLMulti(sheets []sheetData) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -621,6 +637,7 @@ func buildWorkbookXMLMulti(sheets []sheetData) string {
 	b.WriteString(`</sheets></workbook>`)
 	return b.String()
 }
+
 func buildGroupWorkbookXML(sheets []groupSheetData) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -641,6 +658,7 @@ func buildGroupWorkbookXML(sheets []groupSheetData) string {
 	b.WriteString(`</sheets></workbook>`)
 	return b.String()
 }
+
 func buildEmployeeWorkbookXML(sheets []employeeSheetData) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -661,6 +679,7 @@ func buildEmployeeWorkbookXML(sheets []employeeSheetData) string {
 	b.WriteString(`</sheets></workbook>`)
 	return b.String()
 }
+
 func buildProjectWorkbookXML(sheets []groupSheetData) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -681,6 +700,7 @@ func buildProjectWorkbookXML(sheets []groupSheetData) string {
 	b.WriteString(`</sheets></workbook>`)
 	return b.String()
 }
+
 func buildWorkbookRelsXMLMulti(sheetCount int) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -692,6 +712,7 @@ func buildWorkbookRelsXMLMulti(sheetCount int) string {
 	b.WriteString(`</Relationships>`)
 	return b.String()
 }
+
 func buildSheetXML(emp *Employee, worksMonth string, entries []WorkEntry) string {
 	maxB := len([]rune("Дата"))
 	maxC := len([]rune("Начало"))
@@ -845,6 +866,7 @@ func buildSheetXML(emp *Employee, worksMonth string, entries []WorkEntry) string
 	b.WriteString(`</worksheet>`)
 	return b.String()
 }
+
 func buildGroupStatsSheetXML(group *Group, worksMonth string, entries []WorkEntry) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -935,6 +957,7 @@ func buildGroupStatsSheetXML(group *Group, worksMonth string, entries []WorkEntr
 	b.WriteString(`</worksheet>`)
 	return b.String()
 }
+
 func buildEmployeeStatsSheetXML(groupName, worksMonth string, entries []WorkEntry) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -1009,6 +1032,7 @@ func buildEmployeeStatsSheetXML(groupName, worksMonth string, entries []WorkEntr
 	b.WriteString(`</worksheet>`)
 	return b.String()
 }
+
 func buildProjectStatsSheetXML(project *Project, worksMonth string, entries []WorkEntry) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -1121,12 +1145,14 @@ func buildProjectStatsSheetXML(project *Project, worksMonth string, entries []Wo
 	b.WriteString(`</worksheet>`)
 	return b.String()
 }
+
 type cell struct {
 	v        string
 	style    int
 	hasStyle bool
 	numeric  *float64
 }
+
 func writeRow(b *strings.Builder, rowNum int, cells []cell, style int, writeEmpty bool) {
 	fmt.Fprintf(b, `<row r="%d">`, rowNum)
 	for i, c := range cells {
@@ -1153,6 +1179,7 @@ func writeRow(b *strings.Builder, rowNum int, cells []cell, style int, writeEmpt
 	}
 	b.WriteString(`</row>`)
 }
+
 func columnLetter(n int) string {
 	var out []byte
 	for n > 0 {
@@ -1162,6 +1189,7 @@ func columnLetter(n int) string {
 	}
 	return string(out)
 }
+
 func xmlEscape(s string) string {
 	r := strings.NewReplacer(
 		"&", "&amp;",
@@ -1172,6 +1200,7 @@ func xmlEscape(s string) string {
 	)
 	return r.Replace(s)
 }
+
 func endTimeStr(start string, durationMinutes int64) string {
 	h, m, ok := parseHHMMToParts(start)
 	if !ok {
@@ -1181,16 +1210,19 @@ func endTimeStr(start string, durationMinutes int64) string {
 	total %= 24 * 60
 	return fmt.Sprintf("%02d:%02d", total/60, total%60)
 }
+
 func durationHHMMStr(minutes int64) string {
 	if minutes < 0 {
 		minutes = 0
 	}
 	return fmt.Sprintf("%02d:%02d", minutes/60, minutes%60)
 }
+
 const rootRelsXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
 </Relationships>`
+
 func buildWorkbookXML(worksMonth string) string {
 	sheetName := monthLabel(worksMonth)
 	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -1201,8 +1233,9 @@ func buildWorkbookXML(worksMonth string) string {
   </sheets>
 </workbook>`
 }
+
 func (a *App) individualEmployeeStatsExportHandler(w http.ResponseWriter, r *http.Request) {
-	s, ok := currentSession(r)
+	s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -1281,6 +1314,7 @@ func (a *App) individualEmployeeStatsExportHandler(w http.ResponseWriter, r *htt
 	}
 	auditOK(r, s.User, "export_individual_employee_stats", targetEmployee(emp.ID, emp.Login)+" scope="+scope)
 }
+
 func buildIndividualEmployeeStatsXLSX(groupName, empName string, sheets []employeeSheetData) ([]byte, error) {
 	if len(sheets) == 0 {
 		sheets = []employeeSheetData{{month: "", entries: nil}}
@@ -1318,6 +1352,7 @@ func buildIndividualEmployeeStatsXLSX(groupName, empName string, sheets []employ
 	}
 	return buf.Bytes(), nil
 }
+
 func buildIndividualEmployeeStatsSheetXML(groupName, empName, worksMonth string, entries []WorkEntry) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
@@ -1398,8 +1433,9 @@ func buildIndividualEmployeeStatsSheetXML(groupName, empName, worksMonth string,
 	b.WriteString(`</worksheet>`)
 	return b.String()
 }
+
 func (a *App) exportEmployeesCSVHandler(w http.ResponseWriter, r *http.Request) {
-	s, ok := currentSession(r)
+	s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -1440,8 +1476,9 @@ func (a *App) exportEmployeesCSVHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	auditOK(r, s.User, "export_employees_csv", "employees(count="+strconv.Itoa(len(employees))+")")
 }
+
 func (a *App) exportEmployeesXLSXHandler(w http.ResponseWriter, r *http.Request) {
-	s, ok := currentSession(r)
+	s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -1476,6 +1513,7 @@ func (a *App) exportEmployeesXLSXHandler(w http.ResponseWriter, r *http.Request)
 	}
 	auditOK(r, s.User, "export_employees_xlsx", "employees(count="+strconv.Itoa(len(employees))+")")
 }
+
 func buildEmployeesXLSX(employees []Employee) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	zw := zip.NewWriter(buf)
@@ -1504,6 +1542,7 @@ func buildEmployeesXLSX(employees []Employee) ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
+
 func buildEmployeesWorkbookXML() string {
 	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -1512,6 +1551,7 @@ func buildEmployeesWorkbookXML() string {
   </sheets>
 </workbook>`
 }
+
 func buildEmployeesSheetXML(employees []Employee) string {
 	maxLast := len([]rune("Фамилия"))
 	maxFirst := len([]rune("Имя"))
@@ -1578,8 +1618,9 @@ func buildEmployeesSheetXML(employees []Employee) string {
 	b.WriteString(`</worksheet>`)
 	return b.String()
 }
+
 func (a *App) exportGroupsCSVHandler(w http.ResponseWriter, r *http.Request) {
-	s, ok := currentSession(r)
+	s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -1620,8 +1661,9 @@ func (a *App) exportGroupsCSVHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	auditOK(r, s.User, "export_groups_csv", "groups(count="+strconv.Itoa(len(groups))+")")
 }
+
 func (a *App) exportGroupsXLSXHandler(w http.ResponseWriter, r *http.Request) {
-	s, ok := currentSession(r)
+	s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -1656,6 +1698,7 @@ func (a *App) exportGroupsXLSXHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	auditOK(r, s.User, "export_groups_xlsx", "groups(count="+strconv.Itoa(len(groups))+")")
 }
+
 func buildGroupsXLSX(groups []Group) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	zw := zip.NewWriter(buf)
@@ -1684,6 +1727,7 @@ func buildGroupsXLSX(groups []Group) ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
+
 func buildGroupsWorkbookXML() string {
 	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -1692,6 +1736,7 @@ func buildGroupsWorkbookXML() string {
   </sheets>
 </workbook>`
 }
+
 func buildGroupsSheetXML(groups []Group) string {
 	maxName := len([]rune("Наименование"))
 	maxCount := len([]rune("Количество сотрудников"))
@@ -1733,8 +1778,9 @@ func buildGroupsSheetXML(groups []Group) string {
 	b.WriteString(`</worksheet>`)
 	return b.String()
 }
+
 func (a *App) exportProjectsCSVHandler(w http.ResponseWriter, r *http.Request) {
-	s, ok := currentSession(r)
+	s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -1775,8 +1821,9 @@ func (a *App) exportProjectsCSVHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	auditOK(r, s.User, "export_projects_csv", "projects(count="+strconv.Itoa(len(projects))+")")
 }
+
 func (a *App) exportProjectsXLSXHandler(w http.ResponseWriter, r *http.Request) {
-	s, ok := currentSession(r)
+	s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -1811,6 +1858,7 @@ func (a *App) exportProjectsXLSXHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	auditOK(r, s.User, "export_projects_xlsx", "projects(count="+strconv.Itoa(len(projects))+")")
 }
+
 func buildProjectsXLSX(projects []Project) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	zw := zip.NewWriter(buf)
@@ -1839,6 +1887,7 @@ func buildProjectsXLSX(projects []Project) ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
+
 func buildProjectsWorkbookXML() string {
 	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -1847,6 +1896,7 @@ func buildProjectsWorkbookXML() string {
   </sheets>
 </workbook>`
 }
+
 func buildProjectsSheetXML(projects []Project) string {
 	maxName := len([]rune("Наименование"))
 	maxCode := len([]rune("Кодовое обозначение (шифр)"))
@@ -1893,6 +1943,7 @@ func buildProjectsSheetXML(projects []Project) string {
 	b.WriteString(`</worksheet>`)
 	return b.String()
 }
+
 const stylesXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <numFmts count="2">

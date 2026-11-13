@@ -23,6 +23,7 @@ type Config struct {
 	AdminPassword string `json:"admin_password,omitempty"`
 
 	WorkEntriesEditDays int `json:"work_entries_edit_days"`
+	SessionTTLMinutes   int `json:"session_ttl_minutes,omitempty"`
 
 	BackupDir             string `json:"backup_dir,omitempty"`
 	BackupIntervalMinutes int    `json:"backup_interval_minutes,omitempty"`
@@ -70,6 +71,11 @@ func loadConfig(path string) (*Config, error) {
 	if cfg.WorkEntriesEditDays < 0 {
 		cfg.WorkEntriesEditDays = 5
 	}
+
+	if cfg.SessionTTLMinutes <= 0 {
+		cfg.SessionTTLMinutes = 3 * 24 * 60
+	}
+
 	if cfg.BackupIntervalMinutes <= 0 {
 		cfg.BackupIntervalMinutes = 60
 	}

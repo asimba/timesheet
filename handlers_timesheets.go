@@ -10,12 +10,14 @@ import (
 	"strings"
 	"time"
 )
+
 var monthsRU = []string{
 	"", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
 	"Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
 }
+
 func (a *App) timesheetsHandler(w http.ResponseWriter, r *http.Request) {
-	s, ok := currentSession(r)
+	s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -79,6 +81,7 @@ func (a *App) timesheetsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	http.Error(w, "Forbidden", http.StatusForbidden)
 }
+
 func (a *App) resolveWorksMonth(employeeID int64, raw string) string {
 	if raw != "" {
 		return normalizeWorksMonth(raw)
@@ -90,6 +93,7 @@ func (a *App) resolveWorksMonth(employeeID int64, raw string) string {
 	}
 	return time.Now().Format("2006-01")
 }
+
 func normalizeWorksMonth(s string) string {
 	if len(s) == 7 && s[4] == '-' {
 		y, err1 := strconv.Atoi(s[0:4])
@@ -100,6 +104,7 @@ func normalizeWorksMonth(s string) string {
 	}
 	return time.Now().Format("2006-01")
 }
+
 func monthParts(month string) (year, mon int, ok bool) {
 	if len(month) != 7 || month[4] != '-' {
 		return 0, 0, false
@@ -111,6 +116,7 @@ func monthParts(month string) (year, mon int, ok bool) {
 	}
 	return y, m, true
 }
+
 func monthLabel(month string) string {
 	y, m, ok := monthParts(month)
 	if !ok {
@@ -118,6 +124,7 @@ func monthLabel(month string) string {
 	}
 	return monthsRU[m] + " " + strconv.Itoa(y)
 }
+
 func (a *App) fillTimesheetsMonthData(data *TimesheetsData, actor, month string) {
 	projects, err := listProjects(a.db, "name", "asc", "")
 	if err != nil {
@@ -162,6 +169,7 @@ func (a *App) fillTimesheetsMonthData(data *TimesheetsData, actor, month string)
 	data.WorkEntries = entries
 	_ = actor
 }
+
 func (a *App) writeWorksPartial(w http.ResponseWriter, r *http.Request, s Session, worksMonth string) {
 	employeeID := s.EmployeeID
 	if s.Role == RoleAdmin {
@@ -252,8 +260,9 @@ func (a *App) writeWorksPartial(w http.ResponseWriter, r *http.Request, s Sessio
 		log.Printf("ошибка сериализации записей табеля в JSON: %v", err)
 	}
 }
+
 func (a *App) addWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
-	s, ok := currentSession(r)
+	s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -434,8 +443,9 @@ func (a *App) addWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	http.Redirect(w, r, redirect, http.StatusSeeOther)
 }
+
 func (a *App) editWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
-	s, ok := currentSession(r)
+	s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -630,8 +640,9 @@ func (a *App) editWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	http.Redirect(w, r, redirect, http.StatusSeeOther)
 }
+
 func (a *App) deleteWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
-	s, ok := currentSession(r)
+	s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -683,6 +694,7 @@ func (a *App) deleteWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	http.Redirect(w, r, redirect, http.StatusSeeOther)
 }
+
 func (a *App) renderTimesheetsError(w http.ResponseWriter, s Session, msg string) {
 	data := TimesheetsData{
 		Username:   s.User,
@@ -696,12 +708,14 @@ func (a *App) renderTimesheetsError(w http.ResponseWriter, s Session, msg string
 		log.Printf("ошибка рендера timesheets: %v", err)
 	}
 }
+
 func (a *App) renderTimesheets(w http.ResponseWriter, data TimesheetsData) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := a.tmpl.Timesheets.Execute(w, data); err != nil {
 		log.Printf("ошибка рендера timesheets: %v", err)
 	}
 }
+
 func (a *App) isEditableWorkDate(role Role, workDate string) bool {
 	if role == RoleAdmin {
 		return true
@@ -715,9 +729,11 @@ func (a *App) isEditableWorkDate(role Role, workDate string) bool {
 	limitDate := time.Date(limit.Year(), limit.Month(), limit.Day(), 0, 0, 0, 0, time.Local)
 	return !dDate.Before(limitDate)
 }
+
 func (a *App) minWorkDate() string {
 	return time.Now().AddDate(0, 0, -a.cfg.WorkEntriesEditDays).Format("2006-01-02")
 }
+
 func isWorkDateAllowed(workDate string) bool {
 	d, err := time.Parse("2006-01-02", workDate)
 	if err != nil {
@@ -728,6 +744,7 @@ func isWorkDateAllowed(workDate string) bool {
 	limitDate := time.Date(limit.Year(), limit.Month(), limit.Day(), 0, 0, 0, 0, time.Local)
 	return !dDate.After(limitDate)
 }
+
 func computeDurationMinutes(startTime, mode, endTime, durHStr, durMStr string) (int64, string) {
 	startMin, ok := parseHHMM(startTime)
 	if !ok {
@@ -768,6 +785,7 @@ func computeDurationMinutes(startTime, mode, endTime, durHStr, durMStr string) (
 	}
 	return duration, ""
 }
+
 func parseHHMM(s string) (int, bool) {
 	parts := strings.SplitN(s, ":", 2)
 	if len(parts) != 2 {
@@ -783,6 +801,7 @@ func parseHHMM(s string) (int, bool) {
 	}
 	return h*60 + m, true
 }
+
 func formatFullName(last, first, middle string) string {
 	s := last
 	if first != "" {
@@ -799,6 +818,7 @@ func formatFullName(last, first, middle string) string {
 	}
 	return s
 }
+
 func targetWorkEntry(w *WorkEntry) string {
 	return "work_entry(id=" + strconv.FormatInt(w.ID, 10) +
 		", employee_id=" + strconv.FormatInt(w.EmployeeID, 10) +
@@ -807,6 +827,7 @@ func targetWorkEntry(w *WorkEntry) string {
 		", start=" + w.StartTime +
 		", duration_min=" + strconv.FormatInt(w.DurationMinutes, 10) + ")"
 }
+
 func getPrevAndNextWorkEntries(db *sql.DB, employeeID, excludeID int64, workDate, startTime string) (prev, next *WorkEntry, err error) {
 	key := workDate + " " + startTime
 	query := `

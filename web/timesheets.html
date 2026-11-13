@@ -64,9 +64,7 @@ data-start-time="{{$w.StartTime}}"
 data-duration-minutes="{{$w.DurationMinutes}}"
 data-project-id="{{$w.ProjectID}}"
 data-comment="{{$w.Comment}}">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-edit"/></svg>
 </button>
 <form method="POST" action="/timesheets/works/delete?works_month={{$.WorksMonth}}" class="inline-form"
 onsubmit="return confirm('Удалить запись от {{$w.WorkDate}} {{$w.StartTime}}?');">
@@ -75,17 +73,12 @@ onsubmit="return confirm('Удалить запись от {{$w.WorkDate}} {{$w.
 <input type="hidden" name="employee_id" value="{{$.ViewedEmployeeID}}">
 {{end}}
 <button type="submit" class="icon-btn danger" title="Удалить" aria-label="Удалить">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5L11 4M7 7v4M9 7v4"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-trash"/></svg>
 </button>
 </form>
 {{else}}
 <span class="icon-btn locked" title="Запись старше установленного срока — изменение и удаление запрещены" aria-label="Заблокировано">
-<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-<rect x="3" y="7" width="10" height="7" rx="1"/>
-<path d="M5 7V5a3 3 0 0 1 6 0v2"/>
-</svg>
+<svg class="icon"><use href="/static/icons.svg#icon-lock"/></svg>
 </span>
 {{end}}
 </td>
@@ -443,7 +436,7 @@ editBtn.dataset.startTime = w.start_time;
 editBtn.dataset.durationMinutes = String(w.duration_minutes);
 editBtn.dataset.projectId = String(w.project_id);
 editBtn.dataset.comment = w.comment;
-editBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/></svg>';
+editBtn.innerHTML = '<svg class="icon"><use href="/static/icons.svg#icon-edit"/></svg>';
 editBtn.addEventListener('click', function () { fillEditWorkModal(editBtn.dataset); });
 tdActions.appendChild(editBtn);
 const form = document.createElement('form');
@@ -462,14 +455,14 @@ const delBtn = document.createElement('button');
 delBtn.type = 'submit';
 delBtn.className = 'icon-btn danger';
 delBtn.title = 'Удалить';
-delBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h10M6.5 4V3h3v1M5 4l.5 9h5L11 4M7 7v4M9 7v4"/></svg>';
+delBtn.innerHTML = '<svg class="icon"><use href="/static/icons.svg#icon-trash"/></svg>';
 form.appendChild(delBtn);
 tdActions.appendChild(form);
 } else {
 const lockedSpan = document.createElement('span');
 lockedSpan.className = 'icon-btn locked';
 lockedSpan.title = 'Запись старше установленного срока — изменение и удаление запрещены';
-lockedSpan.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg>';
+lockedSpan.innerHTML = '<svg class="icon"><use href="/static/icons.svg#icon-lock"/></svg>';
 tdActions.appendChild(lockedSpan);
 }
 tr.appendChild(tdActions);
