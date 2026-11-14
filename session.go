@@ -21,7 +21,11 @@ type Session struct {
 	Role       Role
 	EmployeeID int64
 	ExpiresAt  time.Time
+	IP         string
+	UserAgent  string
 }
+
+const deviceCookieName = "device_id"
 
 var (
 	sessions   = make(map[string]Session)
@@ -36,10 +40,20 @@ func newToken() string {
 	return hex.EncodeToString(b)
 }
 
-func setSession(w http.ResponseWriter, s Session, maxAge int) {
+func newDeviceID() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		log.Fatal(err)
+	}
+	return hex.EncodeToString(b)
+}
+
+func setSession(w http.ResponseWriter, r *http.Request, s Session, maxAge int) {
 	token := newToken()
 	ttl := time.Duration(maxAge) * time.Second
 	s.ExpiresAt = time.Now().Add(ttl)
+	s.IP = clientIP(r)
+	s.UserAgent = r.UserAgent()
 	sessionsMu.Lock()
 	sessions[token] = s
 	sessionsMu.Unlock()
@@ -65,6 +79,18 @@ func currentSession(w http.ResponseWriter, r *http.Request, maxAge int) (Session
 		ok = false
 	}
 	if ok {
+		if s.IP != "" && clientIP(r) != s.IP {
+			delete(sessions, c.Value)
+			sessionsMu.Unlock()
+			log.Printf("[AUDIT] ip=%s user=%s action=extend_session target=session result=fail reason=ip_changed", clientIP(r), s.User)
+			return Session{}, false
+		}
+		if s.UserAgent != "" && r.UserAgent() != s.UserAgent {
+			delete(sessions, c.Value)
+			sessionsMu.Unlock()
+			log.Printf("[AUDIT] ip=%s user=%s action=extend_session target=session result=fail reason=ua_changed", clientIP(r), s.User)
+			return Session{}, false
+		}
 		ttl := time.Duration(maxAge) * time.Second
 		s.ExpiresAt = time.Now().Add(ttl)
 		sessions[c.Value] = s
@@ -113,4 +139,21 @@ func destroySession(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
+}
+
+func getOrCreateDeviceID(w http.ResponseWriter, r *http.Request) string {
+	if c, err := r.Cookie(deviceCookieName); err == nil && c.Value != "" {
+		return c.Value
+	}
+	id := newDeviceID()
+	const deviceTTL = 30 * 24 * 60 * 60
+	http.SetCookie(w, &http.Cookie{
+		Name:     deviceCookieName,
+		Value:    id,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   deviceTTL,
+	})
+	return id
 }

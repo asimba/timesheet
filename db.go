@@ -3,26 +3,31 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 	sqlite "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 )
+
 type Group struct {
 	ID            int64
 	Name          string
 	EmployeeCount int64
 }
+
 type Project struct {
 	ID               int64
 	Name             string
 	Code             string
 	WorkEntriesCount int64
 }
+
 type Employee struct {
 	ID               int64
 	Login            string
@@ -34,6 +39,7 @@ type Employee struct {
 	GroupName        string
 	WorkEntriesCount int64
 }
+
 type WorkEntry struct {
 	ID                 int64
 	EmployeeID         int64
@@ -50,6 +56,7 @@ type WorkEntry struct {
 	DurationMinutes    int64
 	Comment            string
 }
+
 var (
 	errDuplicateGroup        = errors.New("группа с таким наименованием уже существует")
 	errDuplicateLogin        = errors.New("сотрудник с таким логином уже существует")
@@ -62,6 +69,7 @@ var (
 	errWorkEntryInvalidRef   = errors.New("некорректная ссылка на сотрудника или проект")
 	errWorkEntryNotFound     = errors.New("запись табеля не найдена")
 )
+
 func initDB(path string) (*sql.DB, error) {
 	dir := filepath.Dir(path)
 	if dir != "" && dir != "." {
@@ -113,6 +121,14 @@ func initDB(path string) (*sql.DB, error) {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_work_entries_employee_date
 			ON work_entries(employee_id, work_date)`,
+		`CREATE TABLE IF NOT EXISTS user_devices (
+			id          INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_login  TEXT NOT NULL COLLATE NOCASE,
+			device_id   TEXT NOT NULL UNIQUE,
+			created_at  TEXT NOT NULL,
+			last_seen   TEXT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_user_devices_login ON user_devices(user_login)`,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {
@@ -122,6 +138,7 @@ func initDB(path string) (*sql.DB, error) {
 	}
 	return db, nil
 }
+
 func listGroups(db *sql.DB, dir string) ([]Group, error) {
 	order := "ASC"
 	if dir == "desc" {
@@ -147,6 +164,7 @@ func listGroups(db *sql.DB, dir string) ([]Group, error) {
 	}
 	return groups, rows.Err()
 }
+
 func getGroup(db *sql.DB, id int64) (*Group, error) {
 	var g Group
 	err := db.QueryRow(`SELECT id, name FROM groups WHERE id = ?`, id).Scan(&g.ID, &g.Name)
@@ -158,6 +176,7 @@ func getGroup(db *sql.DB, id int64) (*Group, error) {
 	}
 	return &g, nil
 }
+
 func addGroup(db *sql.DB, name string) (int64, error) {
 	res, err := db.Exec(`INSERT INTO groups (name) VALUES (?)`, name)
 	if err != nil {
@@ -172,6 +191,7 @@ func addGroup(db *sql.DB, name string) (int64, error) {
 	}
 	return id, nil
 }
+
 func updateGroup(db *sql.DB, g Group) error {
 	res, err := db.Exec(`UPDATE groups SET name = ? WHERE id = ?`, g.Name, g.ID)
 	if err != nil {
@@ -189,6 +209,7 @@ func updateGroup(db *sql.DB, g Group) error {
 	}
 	return nil
 }
+
 func deleteGroup(db *sql.DB, id int64) error {
 	var cnt int
 	err := db.QueryRow(`SELECT COUNT(*) FROM employees WHERE group_id = ?`, id).Scan(&cnt)
@@ -214,6 +235,7 @@ func deleteGroup(db *sql.DB, id int64) error {
 	}
 	return nil
 }
+
 func groupExists(db *sql.DB, id int64) (bool, error) {
 	var exists int
 	err := db.QueryRow(`SELECT 1 FROM groups WHERE id = ?`, id).Scan(&exists)
@@ -225,6 +247,7 @@ func groupExists(db *sql.DB, id int64) (bool, error) {
 	}
 	return true, nil
 }
+
 func listProjects(db *sql.DB, sortField, dir, searchQuery string) ([]Project, error) {
 	col := "p.name"
 	if sortField == "code" {
@@ -262,6 +285,7 @@ func listProjects(db *sql.DB, sortField, dir, searchQuery string) ([]Project, er
 	}
 	return projects, rows.Err()
 }
+
 func getProject(db *sql.DB, id int64) (*Project, error) {
 	var p Project
 	err := db.QueryRow(`SELECT id, name, code FROM projects WHERE id = ?`, id).Scan(&p.ID, &p.Name, &p.Code)
@@ -273,6 +297,7 @@ func getProject(db *sql.DB, id int64) (*Project, error) {
 	}
 	return &p, nil
 }
+
 func addProject(db *sql.DB, p Project) (int64, error) {
 	res, err := db.Exec(`INSERT INTO projects (name, code) VALUES (?, ?)`, p.Name, p.Code)
 	if err != nil {
@@ -287,6 +312,7 @@ func addProject(db *sql.DB, p Project) (int64, error) {
 	}
 	return id, nil
 }
+
 func updateProject(db *sql.DB, p Project) error {
 	res, err := db.Exec(`UPDATE projects SET name = ?, code = ? WHERE id = ?`, p.Name, p.Code, p.ID)
 	if err != nil {
@@ -304,6 +330,7 @@ func updateProject(db *sql.DB, p Project) error {
 	}
 	return nil
 }
+
 func deleteProject(db *sql.DB, id int64) error {
 	var cnt int
 	err := db.QueryRow(`SELECT COUNT(*) FROM work_entries WHERE project_id = ?`, id).Scan(&cnt)
@@ -329,6 +356,7 @@ func deleteProject(db *sql.DB, id int64) error {
 	}
 	return nil
 }
+
 func listEmployees(db *sql.DB, sortField, dir string, groupID int64, searchQuery string) ([]Employee, error) {
 	col := "e.login"
 	switch sortField {
@@ -378,6 +406,7 @@ func listEmployees(db *sql.DB, sortField, dir string, groupID int64, searchQuery
 	}
 	return employees, rows.Err()
 }
+
 func getEmployee(db *sql.DB, id int64) (*Employee, error) {
 	var e Employee
 	err := db.QueryRow(`
@@ -394,6 +423,7 @@ func getEmployee(db *sql.DB, id int64) (*Employee, error) {
 	}
 	return &e, nil
 }
+
 func getEmployeeByLogin(db *sql.DB, login string) (*Employee, error) {
 	var e Employee
 	err := db.QueryRow(`
@@ -410,6 +440,7 @@ func getEmployeeByLogin(db *sql.DB, login string) (*Employee, error) {
 	}
 	return &e, nil
 }
+
 func updateEmployee(db *sql.DB, e Employee, password string) error {
 	ok, err := groupExists(db, e.GroupID)
 	if err != nil {
@@ -451,6 +482,7 @@ func updateEmployee(db *sql.DB, e Employee, password string) error {
 	}
 	return nil
 }
+
 func deleteEmployee(db *sql.DB, id int64) (int64, error) {
 	tx, err := db.Begin()
 	if err != nil {
@@ -489,6 +521,7 @@ func deleteEmployee(db *sql.DB, id int64) (int64, error) {
 	}
 	return deletedEntries, nil
 }
+
 func addWorkEntry(db *sql.DB, e WorkEntry) (int64, error) {
 	res, err := db.Exec(`
 		INSERT INTO work_entries (employee_id, project_id, work_date, start_time, duration_minutes, comment)
@@ -506,6 +539,7 @@ func addWorkEntry(db *sql.DB, e WorkEntry) (int64, error) {
 	}
 	return id, nil
 }
+
 func listWorkEntriesByEmployee(db *sql.DB, employeeID int64) ([]WorkEntry, error) {
 	rows, err := db.Query(`
 		SELECT w.id, w.employee_id, e.login, e.last_name, e.first_name, e.middle_name, g.name,
@@ -535,6 +569,7 @@ func listWorkEntriesByEmployee(db *sql.DB, employeeID int64) ([]WorkEntry, error
 	}
 	return entries, rows.Err()
 }
+
 func listWorkEntriesByMonth(db *sql.DB, employeeID int64, month string) ([]WorkEntry, error) {
 	rows, err := db.Query(`
 		SELECT w.id, w.employee_id, e.login, e.last_name, e.first_name, e.middle_name, g.name,
@@ -564,6 +599,7 @@ func listWorkEntriesByMonth(db *sql.DB, employeeID int64, month string) ([]WorkE
 	}
 	return entries, rows.Err()
 }
+
 func listWorkEntryMonths(db *sql.DB, employeeID int64) ([]string, error) {
 	rows, err := db.Query(`
 		SELECT DISTINCT substr(work_date, 1, 7) AS m
@@ -585,6 +621,7 @@ func listWorkEntryMonths(db *sql.DB, employeeID int64) ([]string, error) {
 	}
 	return months, rows.Err()
 }
+
 func getLastWorkEntry(db *sql.DB, employeeID int64) (*WorkEntry, error) {
 	var w WorkEntry
 	err := db.QueryRow(`
@@ -610,6 +647,7 @@ func getLastWorkEntry(db *sql.DB, employeeID int64) (*WorkEntry, error) {
 	}
 	return &w, nil
 }
+
 func getLastOtherWorkEntry(db *sql.DB, employeeID, excludeID int64) (*WorkEntry, error) {
 	var w WorkEntry
 	err := db.QueryRow(`
@@ -635,6 +673,7 @@ func getLastOtherWorkEntry(db *sql.DB, employeeID, excludeID int64) (*WorkEntry,
 	}
 	return &w, nil
 }
+
 func getWorkEntry(db *sql.DB, id int64) (*WorkEntry, error) {
 	var w WorkEntry
 	err := db.QueryRow(`
@@ -658,6 +697,7 @@ func getWorkEntry(db *sql.DB, id int64) (*WorkEntry, error) {
 	}
 	return &w, nil
 }
+
 func updateWorkEntry(db *sql.DB, w WorkEntry) error {
 	res, err := db.Exec(`
 		UPDATE work_entries
@@ -679,6 +719,7 @@ func updateWorkEntry(db *sql.DB, w WorkEntry) error {
 	}
 	return nil
 }
+
 func deleteWorkEntry(db *sql.DB, id int64) error {
 	res, err := db.Exec(`DELETE FROM work_entries WHERE id = ?`, id)
 	if err != nil {
@@ -693,6 +734,7 @@ func deleteWorkEntry(db *sql.DB, id int64) error {
 	}
 	return nil
 }
+
 func isUniqueViolation(err error) bool {
 	var se *sqlite.Error
 	if errors.As(err, &se) {
@@ -701,6 +743,7 @@ func isUniqueViolation(err error) bool {
 	}
 	return false
 }
+
 func isForeignKeyViolation(err error) bool {
 	var se *sqlite.Error
 	if errors.As(err, &se) {
@@ -708,6 +751,7 @@ func isForeignKeyViolation(err error) bool {
 	}
 	return false
 }
+
 func listWorkEntriesByGroup(db *sql.DB, groupID int64) ([]WorkEntry, error) {
 	rows, err := db.Query(`
 		SELECT w.id, w.employee_id, e.login, e.last_name, e.first_name, e.middle_name, g.name,
@@ -737,6 +781,7 @@ func listWorkEntriesByGroup(db *sql.DB, groupID int64) ([]WorkEntry, error) {
 	}
 	return entries, rows.Err()
 }
+
 func listGroupWorkMonths(db *sql.DB, groupID int64) ([]string, error) {
 	rows, err := db.Query(`
 		SELECT DISTINCT substr(w.work_date, 1, 7) AS m
@@ -759,6 +804,7 @@ func listGroupWorkMonths(db *sql.DB, groupID int64) ([]string, error) {
 	}
 	return months, rows.Err()
 }
+
 func listWorkEntriesByGroupAndMonth(db *sql.DB, groupID int64, month string) ([]WorkEntry, error) {
 	rows, err := db.Query(`
 		SELECT w.id, w.employee_id, e.login, e.last_name, e.first_name, e.middle_name, g.name,
@@ -785,12 +831,14 @@ func listWorkEntriesByGroupAndMonth(db *sql.DB, groupID int64, month string) ([]
 	}
 	return entries, rows.Err()
 }
+
 func (w *WorkEntry) Scan(rows *sql.Rows) error {
 	return rows.Scan(&w.ID, &w.EmployeeID, &w.EmployeeLogin,
 		&w.EmployeeLastName, &w.EmployeeFirstName, &w.EmployeeMiddleName, &w.GroupName,
 		&w.ProjectID, &w.ProjectName, &w.ProjectCode,
 		&w.WorkDate, &w.StartTime, &w.DurationMinutes, &w.Comment)
 }
+
 func listWorkEntriesByEmployeeAndMonth(db *sql.DB, employeeID int64, month string) ([]WorkEntry, error) {
 	rows, err := db.Query(`
 		SELECT w.id, w.employee_id, e.login, e.last_name, e.first_name, e.middle_name, g.name,
@@ -820,6 +868,7 @@ func listWorkEntriesByEmployeeAndMonth(db *sql.DB, employeeID int64, month strin
 	}
 	return entries, rows.Err()
 }
+
 func listEmployeeWorkMonths(db *sql.DB, employeeID int64) ([]string, error) {
 	rows, err := db.Query(`
 		SELECT DISTINCT substr(work_date, 1, 7) AS m
@@ -841,6 +890,7 @@ func listEmployeeWorkMonths(db *sql.DB, employeeID int64) ([]string, error) {
 	}
 	return months, rows.Err()
 }
+
 func listWorkEntriesByProject(db *sql.DB, projectID int64) ([]WorkEntry, error) {
 	rows, err := db.Query(`
 		SELECT w.id, w.employee_id, e.login, e.last_name, e.first_name, e.middle_name, g.name,
@@ -867,6 +917,7 @@ func listWorkEntriesByProject(db *sql.DB, projectID int64) ([]WorkEntry, error) 
 	}
 	return entries, rows.Err()
 }
+
 func listProjectWorkMonths(db *sql.DB, projectID int64) ([]string, error) {
 	rows, err := db.Query(`
 		SELECT DISTINCT substr(work_date, 1, 7) AS m
@@ -887,4 +938,39 @@ func listProjectWorkMonths(db *sql.DB, projectID int64) ([]string, error) {
 		months = append(months, m)
 	}
 	return months, rows.Err()
+}
+
+func findUserDevice(db *sql.DB, deviceID string) (string, error) {
+	var login string
+	err := db.QueryRow(`SELECT user_login FROM user_devices WHERE device_id = ?`, deviceID).Scan(&login)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return login, nil
+}
+
+func rememberUserDevice(db *sql.DB, login, deviceID string) error {
+	var existingLogin string
+	err := db.QueryRow(`SELECT user_login FROM user_devices WHERE device_id = ?`, deviceID).Scan(&existingLogin)
+	if err == nil && existingLogin != login {
+		return fmt.Errorf("device_id %q already bound to %q", deviceID, existingLogin)
+	}
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err = db.Exec(`
+		INSERT INTO user_devices (user_login, device_id, created_at, last_seen)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(device_id) DO UPDATE SET user_login = excluded.user_login, last_seen = excluded.last_seen
+	`, login, deviceID, now, now)
+	return err
+}
+
+func forgetUserDevices(db *sql.DB, login string) error {
+	_, err := db.Exec(`DELETE FROM user_devices WHERE user_login = ?`, login)
+	return err
 }

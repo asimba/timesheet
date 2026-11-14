@@ -14,6 +14,25 @@ func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 			redirectByRole(w, r, s.Role)
 			return
 		}
+		deviceID := getOrCreateDeviceID(w, r)
+		login, err := findUserDevice(a.db, deviceID)
+		if err == nil && login != "" {
+			for _, admin := range a.cfg.Admins {
+				if login == admin.User {
+					setSession(w, r, Session{User: admin.User, Role: RoleAdmin}, a.cfg.SessionTTLMinutes*60)
+					auditOK(r, admin.User, "login_device", "session role=admin")
+					http.Redirect(w, r, "/config", http.StatusSeeOther)
+					return
+				}
+			}
+			emp, err := getEmployeeByLogin(a.db, login)
+			if err == nil {
+				setSession(w, r, Session{User: emp.Login, Role: RoleEmployee, EmployeeID: emp.ID}, a.cfg.SessionTTLMinutes*60)
+				auditOK(r, emp.Login, "login_device", "session role=employee")
+				http.Redirect(w, r, "/timesheets", http.StatusSeeOther)
+				return
+			}
+		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if err := a.tmpl.Login.Execute(w, LoginData{
 			WorkEntriesEditDays: a.cfg.WorkEntriesEditDays,
@@ -39,7 +58,11 @@ func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, admin := range a.cfg.Admins {
 		if username == admin.User && password == admin.Password {
-			setSession(w, Session{User: admin.User, Role: RoleAdmin}, a.cfg.SessionTTLMinutes*60)
+			setSession(w, r, Session{User: admin.User, Role: RoleAdmin}, a.cfg.SessionTTLMinutes*60)
+			deviceID := getOrCreateDeviceID(w, r)
+			if err := rememberUserDevice(a.db, admin.User, deviceID); err != nil {
+				log.Printf("не удалось запомнить устройство: %v", err)
+			}
 			auditOK(r, admin.User, "login", "session role=admin")
 			http.Redirect(w, r, "/config", http.StatusSeeOther)
 			return
@@ -74,7 +97,11 @@ func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	setSession(w, Session{User: emp.Login, Role: RoleEmployee, EmployeeID: emp.ID}, a.cfg.SessionTTLMinutes*60)
+	setSession(w, r, Session{User: emp.Login, Role: RoleEmployee, EmployeeID: emp.ID}, a.cfg.SessionTTLMinutes*60)
+	deviceID := getOrCreateDeviceID(w, r)
+	if err := rememberUserDevice(a.db, emp.Login, deviceID); err != nil {
+		log.Printf("не удалось запомнить устройство: %v", err)
+	}
 	auditOK(r, emp.Login, "login", "session role=employee")
 	http.Redirect(w, r, "/timesheets", http.StatusSeeOther)
 }
