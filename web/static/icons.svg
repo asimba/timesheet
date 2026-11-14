@@ -9,4 +9,5 @@
 <symbol id="icon-calendar" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="11" rx="1"/><path d="M2 6h12M5 2v2M11 2v2M5 9h2M9 9h2M5 12h2M9 12h2"/></g></symbol>
 <symbol id="icon-lock" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></g></symbol>
 <symbol id="icon-key" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M8 10v4M2 8h4M10 8h4M4 4l3 3M12 12l-3-3M4 12l3-3M12 4l-3 3"/></g></symbol>
+<symbol id="icon-online" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="currentColor"/></symbol>
 </svg>

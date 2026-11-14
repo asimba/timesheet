@@ -97,6 +97,7 @@ func main() {
 	mux.HandleFunc("/employees", app.requireAdmin(app.addEmployeeHandler))
 	mux.HandleFunc("/employees/edit", app.requireAdmin(app.editEmployeeHandler))
 	mux.HandleFunc("/employees/delete", app.requireAdmin(app.deleteEmployeeHandler))
+	mux.HandleFunc("/employees/sessions/kill", app.requireAdmin(app.killEmployeeSessionsHandler))
 	mux.HandleFunc("/employees/export/csv", app.requireAdmin(app.exportEmployeesCSVHandler))
 	mux.HandleFunc("/employees/export/xlsx", app.requireAdmin(app.exportEmployeesXLSXHandler))
 	mux.HandleFunc("/employees/stats", app.requireAdmin(app.employeeStatsExportHandler))

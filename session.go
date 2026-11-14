@@ -157,3 +157,29 @@ func getOrCreateDeviceID(w http.ResponseWriter, r *http.Request) string {
 	})
 	return id
 }
+
+func activeSessionCountByEmployeeID(employeeID int64) int {
+	now := time.Now()
+	sessionsMu.RLock()
+	defer sessionsMu.RUnlock()
+	n := 0
+	for _, s := range sessions {
+		if s.EmployeeID == employeeID && s.Role == RoleEmployee && s.ExpiresAt.After(now) {
+			n++
+		}
+	}
+	return n
+}
+
+func killSessionsByEmployeeID(employeeID int64) int {
+	sessionsMu.Lock()
+	defer sessionsMu.Unlock()
+	n := 0
+	for tok, s := range sessions {
+		if s.EmployeeID == employeeID && s.Role == RoleEmployee {
+			delete(sessions, tok)
+			n++
+		}
+	}
+	return n
+}

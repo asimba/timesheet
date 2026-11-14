@@ -134,6 +134,8 @@ type ConfigPageData struct {
 	EmployeesGroupID    int64
 	EmployeesSearch     string
 
+	ActiveSessions map[int64]int
+
 	PageError string
 
 	GroupError    string

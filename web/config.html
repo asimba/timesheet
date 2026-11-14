@@ -170,8 +170,23 @@ title="Сортировка по отделу">
 {{range $i, $e := .Employees}}
 <tr>
 <td class="id-col">{{globalIndex $.EmployeesPage $i 10}}</td>
-<td>{{$e.Login}}</td>
-<td><a class="name-link" href="/timesheets?employee_id={{$e.ID}}">{{$e.LastName}}</a></td>
+<td>
+<span class="login-with-session">
+<span class="login-text">{{$e.Login}}</span>
+{{if index $.ActiveSessions $e.ID}}
+<form method="POST" action="/employees/sessions/kill?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&projects_search={{$.ProjectsSearch}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}&employees_search={{$.EmployeesSearch}}" class="inline-form"
+onsubmit="return confirm('Завершить все активные сессии сотрудника {{$e.LastName}} {{$e.FirstName}}?');">
+<input type="hidden" name="id" value="{{$e.ID}}">
+<button type="submit" class="active-session-badge" title="Активная сессия (нажмите, чтобы завершить)" aria-label="Завершить все сессии">
+<svg class="icon"><use href="/static/icons.svg#icon-online"/></svg>
+</button>
+</form>
+{{end}}
+</span>
+</td>
+<td>
+<a class="name-link" href="/timesheets?employee_id={{$e.ID}}">{{$e.LastName}}</a>
+</td>
 <td><a class="name-link" href="/timesheets?employee_id={{$e.ID}}">{{$e.FirstName}}</a></td>
 <td>
 {{if $e.MiddleName}}
@@ -1353,7 +1368,34 @@ tdId.className = 'id-col';
 tdId.textContent = String((page - 1) * EMPLOYEES_PER_PAGE + idx + 1);
 tr.appendChild(tdId);
 const tdLogin = document.createElement('td');
-tdLogin.textContent = e.login;
+const loginWrap = document.createElement('span');
+loginWrap.className = 'login-with-session';
+const loginText = document.createElement('span');
+loginText.className = 'login-text';
+loginText.textContent = e.login;
+loginWrap.appendChild(loginText);
+if (e.active_sessions > 0) {
+const form = document.createElement('form');
+form.method = 'POST';
+form.className = 'inline-form';
+form.action = '/employees/sessions/kill' + window.location.search;
+form.onsubmit = function () {
+return confirm('Завершить все активные сессии сотрудника ' + e.last_name + ' ' + e.first_name + '?');
+};
+const hidden = document.createElement('input');
+hidden.type = 'hidden';
+hidden.name = 'id';
+hidden.value = String(e.id);
+form.appendChild(hidden);
+const btn = document.createElement('button');
+btn.type = 'submit';
+btn.className = 'active-session-badge';
+btn.title = 'Активная сессия (нажмите, чтобы завершить)';
+btn.innerHTML = '<svg class="icon"><use href="/static/icons.svg#icon-online"/></svg>';
+form.appendChild(btn);
+loginWrap.appendChild(form);
+}
+tdLogin.appendChild(loginWrap);
 tr.appendChild(tdLogin);
 const tdLast = document.createElement('td');
 const aLast = document.createElement('a');

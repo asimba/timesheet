@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 )
+
 func (a *App) addEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -133,6 +134,7 @@ func (a *App) addEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		reRenderWithAdd("Не удалось сохранить сотрудника")
 	}
 }
+
 func (a *App) addEmployee(e Employee, password string) error {
 	ok, err := groupExists(a.db, e.GroupID)
 	if err != nil {
@@ -160,6 +162,7 @@ func (a *App) addEmployee(e Employee, password string) error {
 	}
 	return nil
 }
+
 func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -324,6 +327,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		reRenderWithEdit("Не удалось сохранить изменения")
 	}
 }
+
 func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -381,10 +385,23 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	target := targetEmployee(id, existing.Login)
+	
+	killedSessions := killSessionsByEmployeeID(id)
+	
+	forgetErr := forgetUserDevices(a.db, existing.Login)
+	if forgetErr != nil {
+		log.Printf("ошибка удаления устройств сотрудника %d: %v", id, forgetErr)
+	}
+
 	deletedEntries, err := deleteEmployee(a.db, id)
 	switch {
 	case err == nil:
-		auditOK(r, user, "delete", target+" work_entries="+strconv.FormatInt(deletedEntries, 10))
+		auditOK(r, user, "delete", target+" work_entries="+strconv.FormatInt(deletedEntries, 10)+" killed_sessions="+strconv.Itoa(killedSessions))
+		if forgetErr != nil {
+			auditFailF(r, user, "delete_devices", target, "db_error: %v", forgetErr)
+		} else {
+			auditOK(r, user, "delete_devices", target)
+		}
 		http.Redirect(w, r, configRedirectURL(
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -417,6 +434,81 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 			})
 	}
 }
+
+func (a *App) killEmployeeSessionsHandler(w http.ResponseWriter, r *http.Request) {
+	user, ok := currentUser(r)
+	if !ok {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	groupsDir, groupsPage, projectsSort, projectsDir, projectsPage,
+		employeesSort, employeesDir, employeesPage, employeesGroupID, projectsSearch := configParamsFromQuery(r)
+	employeesSearch := normalizeEmployeesSearch(r.URL.Query().Get("employees_search"))
+	idStr := strings.TrimSpace(r.FormValue("id"))
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || id <= 0 {
+		auditFail(r, user, "kill_sessions", "employee(id="+idStr+")", "invalid_id")
+		a.renderConfigPageWith(w, user,
+			groupsDir, groupsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
+			employeesSort, employeesDir, employeesPage,
+			employeesGroupID,
+			employeesSearch,
+			func(d *ConfigPageData) {
+				d.PageError = "Некорректный идентификатор сотрудника"
+			})
+		return
+	}
+	existing, gerr := getEmployee(a.db, id)
+	if gerr != nil {
+		if errors.Is(gerr, errEmployeeNotFound) {
+			auditFail(r, user, "kill_sessions", targetEmployee(id, ""), "not_found")
+			a.renderConfigPageWith(w, user,
+				groupsDir, groupsPage,
+				projectsSort, projectsDir, projectsPage, projectsSearch,
+				employeesSort, employeesDir, employeesPage,
+				employeesGroupID,
+				employeesSearch,
+				func(d *ConfigPageData) {
+					d.PageError = "Сотрудник не найден"
+				})
+			return
+		}
+		log.Printf("ошибка чтения сотрудника: %v", gerr)
+		auditFailF(r, user, "kill_sessions", targetEmployee(id, ""), "db_error: %v", gerr)
+		a.renderConfigPageWith(w, user,
+			groupsDir, groupsPage,
+			projectsSort, projectsDir, projectsPage, projectsSearch,
+			employeesSort, employeesDir, employeesPage,
+			employeesGroupID,
+			employeesSearch,
+			func(d *ConfigPageData) {
+				d.PageError = "Не удалось завершить сессии"
+			})
+		return
+	}
+	target := targetEmployee(id, existing.Login)
+	killed := killSessionsByEmployeeID(id)
+	forgetErr := forgetUserDevices(a.db, existing.Login)
+	if forgetErr != nil {
+		log.Printf("не удалось сбросить устройства сотрудника %d: %v", id, forgetErr)
+		auditFailF(r, user, "kill_sessions", target+" killed="+strconv.Itoa(killed), "db_error: %v", forgetErr)
+	} else {
+		auditOK(r, user, "kill_sessions", target+" killed="+strconv.Itoa(killed)+" devices_reset=1")
+	}
+	http.Redirect(w, r, configRedirectURL(
+		groupsDir, groupsPage,
+		projectsSort, projectsDir, projectsPage,
+		employeesSort, employeesDir, employeesPage,
+		employeesGroupID, employeesSearch,
+		projectsSearch,
+	), http.StatusSeeOther)
+}
+
 func parseOrZero(s string) int64 {
 	n, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
@@ -424,6 +516,7 @@ func parseOrZero(s string) int64 {
 	}
 	return n
 }
+
 func (a *App) generatePasswordHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -458,6 +551,7 @@ func (a *App) generatePasswordHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("ошибка сериализации пароля в JSON: %v", err)
 	}
 }
+
 func (a *App) nextEmployeeIDHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
