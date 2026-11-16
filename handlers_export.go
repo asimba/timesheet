@@ -9,10 +9,53 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
 )
+
+func sanitizeFilename(s string) string {
+	cleaned := strings.Map(func(r rune) rune {
+		switch r {
+		case '/', '\\', ':', '*', '?', '"', '<', '>', '|', '\r', '\n', '\t', ';':
+			return '_'
+		}
+		if r < 0x20 {
+			return '_'
+		}
+		return r
+	}, s)
+	cleaned = strings.TrimSpace(cleaned)
+	if cleaned == "" {
+		return "file"
+	}
+	if len([]rune(cleaned)) > 200 {
+		cleaned = string([]rune(cleaned)[:200])
+	}
+	return cleaned
+}
+
+func setAttachmentHeaders(w http.ResponseWriter, filename string, contentLength int, contentType string) {
+	safe := sanitizeFilename(filename)
+	ascii := make([]byte, 0, len(safe))
+	for _, r := range safe {
+		if r < 0x80 {
+			ascii = append(ascii, byte(r))
+		} else {
+			ascii = append(ascii, '_')
+		}
+	}
+	asciiName := string(ascii)
+	if asciiName == "" {
+		asciiName = "file"
+	}
+	encoded := url.PathEscape(safe)
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+asciiName+`"; filename*=UTF-8''`+encoded)
+	w.Header().Set("Content-Length", strconv.Itoa(contentLength))
+	w.Header().Set("Cache-Control", "no-store")
+}
 
 func (a *App) exportTimesheetsHandler(w http.ResponseWriter, r *http.Request) {
 	s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
@@ -40,8 +83,12 @@ func (a *App) exportTimesheetsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	emp, err := getEmployee(a.db, employeeID)
 	if err != nil {
+		if errors.Is(err, errEmployeeNotFound) {
+			http.Error(w, "Employee not found", http.StatusNotFound)
+			return
+		}
 		log.Printf("экспорт: ошибка чтения сотрудника %d: %v", employeeID, err)
-		http.Error(w, "Employee not found", http.StatusNotFound)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 	worksMonth := normalizeWorksMonth(r.URL.Query().Get("works_month"))
@@ -95,10 +142,7 @@ func (a *App) exportTimesheetsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		filename = "timesheet_" + emp.Login + "_" + worksMonth + ".xlsx"
 	}
-	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
-	w.Header().Set("Content-Length", strconv.Itoa(len(xlsxBytes)))
-	w.Header().Set("Cache-Control", "no-store")
+	setAttachmentHeaders(w, filename, len(xlsxBytes), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	if _, err := w.Write(xlsxBytes); err != nil {
 		log.Printf("экспорт: ошибка записи ответа: %v", err)
 	}
@@ -153,21 +197,22 @@ func (a *App) groupStatsExportHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		targetMonths = []string{worksMonth}
 	}
+	allEntries, err := listWorkEntriesByGroup(a.db, id)
+	if err != nil {
+		log.Printf("экспорт статистики отдела: ошибка чтения записей: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	byMonth := make(map[string][]WorkEntry)
+	for _, e := range allEntries {
+		if len(e.WorkDate) >= 7 {
+			m := e.WorkDate[:7]
+			byMonth[m] = append(byMonth[m], e)
+		}
+	}
 	sheets := make([]groupSheetData, 0, len(targetMonths))
 	for _, m := range targetMonths {
-		entries, err := listWorkEntriesByGroup(a.db, id)
-		if err != nil {
-			log.Printf("экспорт статистики отдела: ошибка чтения записей за %s: %v", m, err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-		var monthEntries []WorkEntry
-		for _, e := range entries {
-			if e.WorkDate[:7] == m {
-				monthEntries = append(monthEntries, e)
-			}
-		}
-		sheets = append(sheets, groupSheetData{month: m, entries: monthEntries})
+		sheets = append(sheets, groupSheetData{month: m, entries: byMonth[m]})
 	}
 	xlsxBytes, err := buildGroupStatsXLSX(group, sheets)
 	if err != nil {
@@ -180,10 +225,7 @@ func (a *App) groupStatsExportHandler(w http.ResponseWriter, r *http.Request) {
 		suffix = worksMonth
 	}
 	filename := "group_stats_" + group.Name + "_" + suffix + ".xlsx"
-	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
-	w.Header().Set("Content-Length", strconv.Itoa(len(xlsxBytes)))
-	w.Header().Set("Cache-Control", "no-store")
+	setAttachmentHeaders(w, filename, len(xlsxBytes), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	if _, err := w.Write(xlsxBytes); err != nil {
 		log.Printf("экспорт статистики отдела: ошибка записи ответа: %v", err)
 	}
@@ -212,8 +254,12 @@ func (a *App) employeeStatsExportHandler(w http.ResponseWriter, r *http.Request)
 	}
 	group, err := getGroup(a.db, id)
 	if err != nil {
+		if errors.Is(err, errGroupNotFound) {
+			http.Error(w, "Group not found", http.StatusNotFound)
+			return
+		}
 		log.Printf("экспорт статистики сотрудников: ошибка чтения отдела %d: %v", id, err)
-		http.Error(w, "Group not found", http.StatusNotFound)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 	scope := strings.TrimSpace(r.URL.Query().Get("scope"))
@@ -253,17 +299,8 @@ func (a *App) employeeStatsExportHandler(w http.ResponseWriter, r *http.Request)
 	if scope != "all" {
 		suffix = worksMonth
 	}
-	cleanGroupName := strings.Map(func(r rune) rune {
-		if r == '/' || r == '\\' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
-			return '_'
-		}
-		return r
-	}, group.Name)
-	filename := "employees_stats_" + cleanGroupName + "_" + suffix + ".xlsx"
-	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
-	w.Header().Set("Content-Length", strconv.Itoa(len(xlsxBytes)))
-	w.Header().Set("Cache-Control", "no-store")
+	filename := "employees_stats_" + group.Name + "_" + suffix + ".xlsx"
+	setAttachmentHeaders(w, filename, len(xlsxBytes), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	if _, err := w.Write(xlsxBytes); err != nil {
 		log.Printf("экспорт статистики сотрудников: ошибка записи ответа: %v", err)
 	}
@@ -323,15 +360,16 @@ func (a *App) projectStatsExportHandler(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+	byMonth := make(map[string][]WorkEntry)
+	for _, e := range allEntries {
+		if len(e.WorkDate) >= 7 {
+			m := e.WorkDate[:7]
+			byMonth[m] = append(byMonth[m], e)
+		}
+	}
 	sheets := make([]groupSheetData, 0, len(targetMonths))
 	for _, m := range targetMonths {
-		var monthEntries []WorkEntry
-		for _, e := range allEntries {
-			if len(e.WorkDate) >= 7 && e.WorkDate[:7] == m {
-				monthEntries = append(monthEntries, e)
-			}
-		}
-		sheets = append(sheets, groupSheetData{month: m, entries: monthEntries})
+		sheets = append(sheets, groupSheetData{month: m, entries: byMonth[m]})
 	}
 	xlsxBytes, err := buildProjectStatsXLSX(project, sheets)
 	if err != nil {
@@ -343,20 +381,12 @@ func (a *App) projectStatsExportHandler(w http.ResponseWriter, r *http.Request) 
 	if scope != "all" {
 		suffix = worksMonth
 	}
-	cleanName := strings.Map(func(r rune) rune {
-		if r == '/' || r == '\\' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
-			return '_'
-		}
-		return r
-	}, project.Code)
-	if cleanName == "" {
-		cleanName = "project"
+	code := project.Code
+	if code == "" {
+		code = "project"
 	}
-	filename := "project_stats_" + cleanName + "_" + suffix + ".xlsx"
-	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
-	w.Header().Set("Content-Length", strconv.Itoa(len(xlsxBytes)))
-	w.Header().Set("Cache-Control", "no-store")
+	filename := "project_stats_" + code + "_" + suffix + ".xlsx"
+	setAttachmentHeaders(w, filename, len(xlsxBytes), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	if _, err := w.Write(xlsxBytes); err != nil {
 		log.Printf("экспорт статистики проекта: ошибка записи ответа: %v", err)
 	}
@@ -1262,28 +1292,10 @@ func endTimeStr(start string, durationMinutes int64) string {
 	return fmt.Sprintf("%02d:%02d", total/60, total%60)
 }
 
-func durationHHMMStr(minutes int64) string {
-	if minutes < 0 {
-		minutes = 0
-	}
-	return fmt.Sprintf("%02d:%02d", minutes/60, minutes%60)
-}
-
 const rootRelsXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
 </Relationships>`
-
-func buildWorkbookXML(worksMonth string) string {
-	sheetName := monthLabel(worksMonth)
-	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
-          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <sheets>
-    <sheet name="` + xmlEscape(sheetName) + `" sheetId="1" r:id="rId1"/>
-  </sheets>
-</workbook>`
-}
 
 func (a *App) individualEmployeeStatsExportHandler(w http.ResponseWriter, r *http.Request) {
 	s, ok := currentSession(w, r, a.cfg.SessionTTLMinutes*60)
@@ -1307,8 +1319,12 @@ func (a *App) individualEmployeeStatsExportHandler(w http.ResponseWriter, r *htt
 	}
 	emp, err := getEmployee(a.db, id)
 	if err != nil {
+		if errors.Is(err, errEmployeeNotFound) {
+			http.Error(w, "Employee not found", http.StatusNotFound)
+			return
+		}
 		log.Printf("экспорт статистики сотрудника: ошибка чтения сотрудника %d: %v", id, err)
-		http.Error(w, "Employee not found", http.StatusNotFound)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 	scope := strings.TrimSpace(r.URL.Query().Get("scope"))
@@ -1349,17 +1365,8 @@ func (a *App) individualEmployeeStatsExportHandler(w http.ResponseWriter, r *htt
 	if scope != "all" {
 		suffix = worksMonth
 	}
-	cleanName := strings.Map(func(r rune) rune {
-		if r == '/' || r == '\\' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
-			return '_'
-		}
-		return r
-	}, fullName)
-	filename := "employee_stats_" + cleanName + "_" + suffix + ".xlsx"
-	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
-	w.Header().Set("Content-Length", strconv.Itoa(len(xlsxBytes)))
-	w.Header().Set("Cache-Control", "no-store")
+	filename := "employee_stats_" + fullName + "_" + suffix + ".xlsx"
+	setAttachmentHeaders(w, filename, len(xlsxBytes), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	if _, err := w.Write(xlsxBytes); err != nil {
 		log.Printf("экспорт статистики сотрудника: ошибка записи ответа: %v", err)
 	}
@@ -1530,7 +1537,7 @@ func (a *App) exportEmployeesCSVHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	filename := "employees.csv"
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+sanitizeFilename(filename)+`"`)
 	w.Header().Set("Cache-Control", "no-store")
 	cw := csv.NewWriter(w)
 	cw.Comma = ';'
@@ -1578,10 +1585,7 @@ func (a *App) exportEmployeesXLSXHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	filename := "employees.xlsx"
-	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
-	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
-	w.Header().Set("Cache-Control", "no-store")
+	setAttachmentHeaders(w, filename, len(data), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	if _, err := w.Write(data); err != nil {
 		log.Printf("экспорт сотрудников (xlsx): ошибка записи ответа: %v", err)
 	}
@@ -1715,7 +1719,7 @@ func (a *App) exportGroupsCSVHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	filename := "groups.csv"
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+sanitizeFilename(filename)+`"`)
 	w.Header().Set("Cache-Control", "no-store")
 	cw := csv.NewWriter(w)
 	cw.Comma = ';'
@@ -1763,10 +1767,7 @@ func (a *App) exportGroupsXLSXHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filename := "groups.xlsx"
-	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
-	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
-	w.Header().Set("Cache-Control", "no-store")
+	setAttachmentHeaders(w, filename, len(data), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	if _, err := w.Write(data); err != nil {
 		log.Printf("экспорт отделов (xlsx): ошибка записи ответа: %v", err)
 	}
@@ -1875,7 +1876,7 @@ func (a *App) exportProjectsCSVHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	filename := "projects.csv"
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+sanitizeFilename(filename)+`"`)
 	w.Header().Set("Cache-Control", "no-store")
 	cw := csv.NewWriter(w)
 	cw.Comma = ';'
@@ -1923,10 +1924,7 @@ func (a *App) exportProjectsXLSXHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	filename := "projects.xlsx"
-	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
-	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
-	w.Header().Set("Cache-Control", "no-store")
+	setAttachmentHeaders(w, filename, len(data), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	if _, err := w.Write(data); err != nil {
 		log.Printf("экспорт проектов (xlsx): ошибка записи ответа: %v", err)
 	}

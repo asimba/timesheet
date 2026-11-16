@@ -104,6 +104,7 @@ func buildTemplates(a *App) (*Templates, error) {
 type LoginData struct {
 	Error               string
 	WorkEntriesEditDays int
+	CSRFToken           string
 }
 
 type ConfigPageData struct {
@@ -159,6 +160,8 @@ type ConfigPageData struct {
 
 	EditProject      *Project
 	EditProjectError string
+
+	CSRFToken string
 }
 
 type TimesheetsData struct {
@@ -198,4 +201,6 @@ type TimesheetsData struct {
 	EditWorkMode      string
 
 	ExportMode string
+
+	CSRFToken string
 }

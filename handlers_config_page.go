@@ -42,7 +42,7 @@ func (a *App) configPageHandler(w http.ResponseWriter, r *http.Request) {
 		a.writeEmployeesPartial(w, employeesSort, employeesDir, employeesPage, employeesGroupID, employeesSearch)
 		return
 	}
-	a.renderConfigPageWith(w, user,
+	a.renderConfigPageWith(w, r, user,
 		groupsDir, groupsPage,
 		projectsSort, projectsDir, projectsPage, projectsSearch,
 		employeesSort, employeesDir, employeesPage,
@@ -354,8 +354,8 @@ func normalizePage(p string) int {
 	return n
 }
 
-func (a *App) renderConfigPage(w http.ResponseWriter, user, groupErr, employeeErr string) {
-	a.renderConfigPageWith(w, user,
+func (a *App) renderConfigPage(w http.ResponseWriter, r *http.Request, user, groupErr, employeeErr string) {
+	a.renderConfigPageWith(w, r, user,
 		"asc", 1,
 		"name", "asc", 1, "",
 		"login", "asc", 1,
@@ -367,8 +367,8 @@ func (a *App) renderConfigPage(w http.ResponseWriter, user, groupErr, employeeEr
 		})
 }
 
-func (a *App) renderConfigPageWithPageError(w http.ResponseWriter, user, pageErr string) {
-	a.renderConfigPageWith(w, user,
+func (a *App) renderConfigPageWithPageError(w http.ResponseWriter, r *http.Request, user, pageErr string) {
+	a.renderConfigPageWith(w, r, user,
 		"asc", 1,
 		"name", "asc", 1, "",
 		"login", "asc", 1,
@@ -381,6 +381,7 @@ func (a *App) renderConfigPageWithPageError(w http.ResponseWriter, user, pageErr
 
 func (a *App) renderConfigPageWith(
 	w http.ResponseWriter,
+	r *http.Request,
 	user, groupsDir string, groupsPage int,
 	projectsSort, projectsDir string, projectsPage int, projectsSearch string,
 	employeesSort, employeesDir string, employeesPage int,
@@ -436,6 +437,7 @@ func (a *App) renderConfigPageWith(
 		EmployeesGroupID:    employeesGroupID,
 		EmployeesSearch:     employeesSearch,
 		ActiveSessions:      make(map[int64]int),
+		CSRFToken:           a.csrfTokenForTemplate(r),
 	}
 	for _, e := range employees {
 		if n := activeSessionCountByEmployeeID(e.ID); n > 0 {

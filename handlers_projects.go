@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 )
+
 func (a *App) addProjectHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -24,7 +25,7 @@ func (a *App) addProjectHandler(w http.ResponseWriter, r *http.Request) {
 	code := strings.TrimSpace(r.FormValue("code"))
 	target := targetProject(0, name, code)
 	reRenderWithError := func(errMsg string) {
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -76,6 +77,7 @@ func (a *App) addProjectHandler(w http.ResponseWriter, r *http.Request) {
 		reRenderWithError("Не удалось сохранить проект")
 	}
 }
+
 func (a *App) editProjectHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -93,7 +95,7 @@ func (a *App) editProjectHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
 		auditFail(r, user, "update", "project(id="+idStr+")", "invalid_id")
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -108,7 +110,7 @@ func (a *App) editProjectHandler(w http.ResponseWriter, r *http.Request) {
 	code := strings.TrimSpace(r.FormValue("code"))
 	target := targetProject(id, name, code)
 	reRenderWithEdit := func(errMsg string) {
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -155,7 +157,7 @@ func (a *App) editProjectHandler(w http.ResponseWriter, r *http.Request) {
 		reRenderWithEdit("Проект с таким кодовым обозначением уже существует")
 	case errors.Is(err, errProjectNotFound):
 		auditFail(r, user, "update", target, "not_found")
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -170,6 +172,7 @@ func (a *App) editProjectHandler(w http.ResponseWriter, r *http.Request) {
 		reRenderWithEdit("Не удалось сохранить изменения")
 	}
 }
+
 func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUser(r)
 	if !ok {
@@ -187,7 +190,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
 		auditFail(r, user, "delete", "project(id="+idStr+")", "invalid_id")
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -202,7 +205,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, errProjectNotFound) {
 			auditFail(r, user, "delete", targetProject(id, "", ""), "not_found")
-			a.renderConfigPageWith(w, user,
+			a.renderConfigPageWith(w, r, user,
 				groupsDir, groupsPage,
 				projectsSort, projectsDir, projectsPage, projectsSearch,
 				employeesSort, employeesDir, employeesPage,
@@ -215,7 +218,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("ошибка чтения проекта: %v", err)
 		auditFailF(r, user, "delete", targetProject(id, "", ""), "db_error: %v", err)
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -240,7 +243,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 		), http.StatusSeeOther)
 	case errors.Is(err, errProjectHasWorkEntries):
 		auditFail(r, user, "delete", target, "has_work_entries")
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -251,7 +254,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 			})
 	case errors.Is(err, errProjectNotFound):
 		auditFail(r, user, "delete", target, "not_found")
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -263,7 +266,7 @@ func (a *App) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 	default:
 		log.Printf("ошибка удаления проекта: %v", err)
 		auditFailF(r, user, "delete", target, "db_error: %v", err)
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,

@@ -74,6 +74,7 @@ title="Изменить" aria-label="Изменить">
 </button>
 <form method="POST" action="/groups/delete?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&projects_search={{$.ProjectsSearch}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}&employees_search={{$.EmployeesSearch}}" class="inline-form"
 onsubmit="return confirm('Удалить группу {{$g.Name}}?');">
+<input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
 <input type="hidden" name="id" value="{{$g.ID}}">
 <button type="submit" class="icon-btn danger" title="Удалить" aria-label="Удалить">
 <svg class="icon"><use href="/static/icons.svg#icon-trash"/></svg>
@@ -176,6 +177,7 @@ title="Сортировка по отделу">
 {{if index $.ActiveSessions $e.ID}}
 <form method="POST" action="/employees/sessions/kill?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&projects_search={{$.ProjectsSearch}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}&employees_search={{$.EmployeesSearch}}" class="inline-form"
 onsubmit="return confirm('Завершить все активные сессии сотрудника {{$e.LastName}} {{$e.FirstName}}?');">
+<input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
 <input type="hidden" name="id" value="{{$e.ID}}">
 <button type="submit" class="active-session-badge" title="Активная сессия (нажмите, чтобы завершить)" aria-label="Завершить все сессии">
 <svg class="icon"><use href="/static/icons.svg#icon-online"/></svg>
@@ -218,6 +220,7 @@ title="Изменить" aria-label="Изменить">
 </button>
 <form method="POST" action="/employees/delete?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&projects_search={{$.ProjectsSearch}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}&employees_search={{$.EmployeesSearch}}" class="inline-form"
 onsubmit="return confirm('Удалить сотрудника {{$e.Login}}?');">
+<input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
 <input type="hidden" name="id" value="{{$e.ID}}">
 <button type="submit" class="icon-btn danger" title="Удалить" aria-label="Удалить">
 <svg class="icon"><use href="/static/icons.svg#icon-trash"/></svg>
@@ -320,6 +323,7 @@ title="Изменить" aria-label="Изменить">
 </button>
 <form method="POST" action="/projects/delete?groups_dir={{$.GroupsDir}}&groups_page={{$.GroupsPage}}&projects_sort={{$.ProjectsSort}}&projects_dir={{$.ProjectsDir}}&projects_page={{$.ProjectsPage}}&projects_search={{$.ProjectsSearch}}&employees_sort={{$.EmployeesSort}}&employees_dir={{$.EmployeesDir}}&employees_page={{$.EmployeesPage}}&employees_group_id={{$.EmployeesGroupID}}&employees_search={{$.EmployeesSearch}}" class="inline-form"
 onsubmit="return confirm('Удалить проект {{$p.Code}}?');">
+<input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
 <input type="hidden" name="id" value="{{$p.ID}}">
 <button type="submit" class="icon-btn danger" title="Удалить" aria-label="Удалить">
 <svg class="icon"><use href="/static/icons.svg#icon-trash"/></svg>
@@ -370,6 +374,7 @@ href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sor
 <div class="modal" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
 <h2 id="groupModalTitle">Добавить группу/отдел</h2>
 <form method="POST" action="/groups?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&projects_search={{.ProjectsSearch}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 <div class="field">
 <label for="groupName">Наименование</label>
 <input type="text" id="groupName" name="name" required maxlength="200" autocomplete="off">
@@ -386,6 +391,7 @@ href="/config?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sor
 <div class="modal" role="dialog" aria-modal="true" aria-labelledby="projectModalTitle">
 <h2 id="projectModalTitle">Добавить объект/проект</h2>
 <form method="POST" action="/projects?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&projects_search={{.ProjectsSearch}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 <div class="field">
 <label for="projectName">Наименование</label>
 <input type="text" id="projectName" name="name" required maxlength="1024" autocomplete="off"
@@ -408,6 +414,7 @@ value="{{.AddProjectCode}}">
 <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editProjectModalTitle">
 <h2 id="editProjectModalTitle">Редактировать объект/проект</h2>
 <form method="POST" action="/projects/edit?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&projects_search={{.ProjectsSearch}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}" id="editProjectForm">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 <input type="hidden" name="id" id="editProjectId">
 <div class="field">
 <label for="editProjectName">Наименование</label>
@@ -429,6 +436,7 @@ value="{{.AddProjectCode}}">
 <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editGroupModalTitle">
 <h2 id="editGroupModalTitle">Редактировать группу/отдел</h2>
 <form method="POST" action="/groups/edit?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&projects_search={{.ProjectsSearch}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}" id="editGroupForm">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 <input type="hidden" name="id" id="editGroupId">
 <div class="field">
 <label for="editGroupName">Наименование</label>
@@ -447,6 +455,7 @@ value="{{.AddProjectCode}}">
 <h2 id="employeeModalTitle">Добавить сотрудника</h2>
 {{if .AllGroups}}
 <form method="POST" action="/employees?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&projects_search={{.ProjectsSearch}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 <div class="field">
 <label for="empLogin">Логин</label>
 <input type="text" id="empLogin" name="login" required maxlength="100" autocomplete="off"
@@ -505,6 +514,7 @@ value="{{.AddMiddleName}}">
 <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editEmployeeModalTitle">
 <h2 id="editEmployeeModalTitle">Редактировать учётную запись сотрудника</h2>
 <form method="POST" action="/employees/edit?groups_dir={{.GroupsDir}}&groups_page={{.GroupsPage}}&projects_sort={{.ProjectsSort}}&projects_dir={{.ProjectsDir}}&projects_page={{.ProjectsPage}}&projects_search={{.ProjectsSearch}}&employees_sort={{.EmployeesSort}}&employees_dir={{.EmployeesDir}}&employees_page={{.EmployeesPage}}&employees_group_id={{.EmployeesGroupID}}&employees_search={{.EmployeesSearch}}" id="editEmployeeForm">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 <input type="hidden" name="id" id="editEmpId">
 <div class="field">
 <label for="editEmpLastName">Фамилия</label>
@@ -710,7 +720,10 @@ value="{{.AddMiddleName}}">
 <p class="modal-question">Вы действительно хотите выйти?</p>
 <div class="modal-actions">
 <button type="button" class="btn btn-secondary" data-close="logout">Отмена</button>
-<a class="btn" href="/logout">Выйти</a>
+<form method="POST" action="/logout" style="display:inline;">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+<button type="submit" class="btn">Выйти</button>
+</form>
 </div>
 </div>
 </div>
@@ -724,6 +737,7 @@ value="{{.AddMiddleName}}">
 </div>
 </div>
 <script>
+const CSRF_TOKEN = "{{.CSRFToken}}";
 (function () {
 const TABS = ['groups', 'employees', 'projects'];
 const TAB_STORAGE_KEY = 'configActiveTab';
@@ -1215,6 +1229,11 @@ form.method = 'POST';
 form.className = 'inline-form';
 form.action = '/groups/delete' + window.location.search;
 form.onsubmit = function () { return confirm('Удалить группу ' + g.name + '?'); };
+const csrfHidden = document.createElement('input');
+csrfHidden.type = 'hidden';
+csrfHidden.name = 'csrf_token';
+csrfHidden.value = CSRF_TOKEN;
+form.appendChild(csrfHidden);
 const hidden = document.createElement('input');
 hidden.type = 'hidden';
 hidden.name = 'id';
@@ -1382,6 +1401,11 @@ form.action = '/employees/sessions/kill' + window.location.search;
 form.onsubmit = function () {
 return confirm('Завершить все активные сессии сотрудника ' + e.last_name + ' ' + e.first_name + '?');
 };
+const csrfHidden = document.createElement('input');
+csrfHidden.type = 'hidden';
+csrfHidden.name = 'csrf_token';
+csrfHidden.value = CSRF_TOKEN;
+form.appendChild(csrfHidden);
 const hidden = document.createElement('input');
 hidden.type = 'hidden';
 hidden.name = 'id';
@@ -1485,6 +1509,11 @@ form.method = 'POST';
 form.className = 'inline-form';
 form.action = '/employees/delete' + window.location.search;
 form.onsubmit = function () { return confirm('Удалить сотрудника ' + e.login + '?'); };
+const csrfHidden2 = document.createElement('input');
+csrfHidden2.type = 'hidden';
+csrfHidden2.name = 'csrf_token';
+csrfHidden2.value = CSRF_TOKEN;
+form.appendChild(csrfHidden2);
 const hidden = document.createElement('input');
 hidden.type = 'hidden';
 hidden.name = 'id';
@@ -1701,6 +1730,11 @@ form.method = 'POST';
 form.className = 'inline-form';
 form.action = '/projects/delete' + window.location.search;
 form.onsubmit = function () { return confirm('Удалить проект ' + p.code + '?'); };
+const csrfHidden = document.createElement('input');
+csrfHidden.type = 'hidden';
+csrfHidden.name = 'csrf_token';
+csrfHidden.value = CSRF_TOKEN;
+form.appendChild(csrfHidden);
 const hidden = document.createElement('input');
 hidden.type = 'hidden';
 hidden.name = 'id';

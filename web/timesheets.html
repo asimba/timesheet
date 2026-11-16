@@ -68,6 +68,7 @@ data-comment="{{$w.Comment}}">
 </button>
 <form method="POST" action="/timesheets/works/delete?works_month={{$.WorksMonth}}" class="inline-form"
 onsubmit="return confirm('Удалить запись от {{$w.WorkDate}} {{$w.StartTime}}?');">
+<input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
 <input type="hidden" name="id" value="{{$w.ID}}">
 {{if eq $.Role "admin"}}
 <input type="hidden" name="employee_id" value="{{$.ViewedEmployeeID}}">
@@ -108,6 +109,7 @@ data-ajax-month="works"
 <div class="modal" role="dialog" aria-modal="true" aria-labelledby="addWorkModalTitle">
 <h2 id="addWorkModalTitle">Добавить работы</h2>
 <form method="POST" action="/timesheets/works?works_month={{.WorksMonth}}" id="addWorkForm">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 {{if eq .Role "admin"}}
 <input type="hidden" name="employee_id" value="{{.ViewedEmployeeID}}">
 {{end}}
@@ -171,6 +173,7 @@ data-ajax-month="works"
 <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editWorkModalTitle">
 <h2 id="editWorkModalTitle">Редактировать запись табеля</h2>
 <form method="POST" action="/timesheets/works/edit?works_month={{.WorksMonth}}" id="editWorkForm">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 <input type="hidden" name="id" id="editWorkId">
 {{if eq .Role "admin"}}
 <input type="hidden" name="employee_id" value="{{.ViewedEmployeeID}}">
@@ -260,11 +263,15 @@ href="/timesheets/export?{{if eq .Role "admin"}}employee_id={{.ViewedEmployeeID}
 <p class="modal-question">Вы действительно хотите выйти?</p>
 <div class="modal-actions">
 <button type="button" class="btn btn-secondary" data-close="logout">Отмена</button>
-<a class="btn" href="/logout">Выйти</a>
+<form method="POST" action="/logout" style="display:inline;">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+<button type="submit" class="btn">Выйти</button>
+</form>
 </div>
 </div>
 </div>
 <script>
+const CSRF_TOKEN = "{{.CSRFToken}}";
 (function () {
 const currentUserRole = "{{.Role}}";
 const minWorkDate = "{{minWorkDate}}";
@@ -328,6 +335,18 @@ document.getElementById('editDurH').value = Math.floor(total / 60);
 document.getElementById('editDurM').value = total % 60;
 document.getElementById('editWorkProject').value = d.projectId;
 document.getElementById('editWorkComment').value = d.comment || '';
+const startParts = (d.startTime || '').split(':');
+if (startParts.length === 2) {
+const totalEnd = (parseInt(startParts[0], 10) || 0) * 60
++ (parseInt(startParts[1], 10) || 0)
++ total;
+const hh = Math.floor((totalEnd % 1440) / 60);
+const mm = totalEnd % 60;
+document.getElementById('editWorkEnd').value =
+String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+} else {
+document.getElementById('editWorkEnd').value = '';
+}
 const radios = document.querySelectorAll('#editWorkForm input[name="mode"]');
 radios.forEach(function (r) { r.checked = (r.value === 'duration'); });
 syncEditMode();
@@ -446,6 +465,11 @@ form.action = '/timesheets/works/delete' + window.location.search;
 form.onsubmit = function () {
 return confirm('Удалить запись от ' + w.work_date + ' ' + w.start_time + '?');
 };
+const csrfHidden = document.createElement('input');
+csrfHidden.type = 'hidden';
+csrfHidden.name = 'csrf_token';
+csrfHidden.value = CSRF_TOKEN;
+form.appendChild(csrfHidden);
 const hidden = document.createElement('input');
 hidden.type = 'hidden';
 hidden.name = 'id';

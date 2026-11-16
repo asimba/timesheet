@@ -32,6 +32,7 @@ func (a *App) timesheetsHandler(w http.ResponseWriter, r *http.Request) {
 		Role:        s.Role,
 		EmployeeID:  s.EmployeeID,
 		AddWorkMode: "end",
+		CSRFToken:   a.csrfTokenForTemplate(r),
 	}
 	worksMonthRaw := strings.TrimSpace(r.URL.Query().Get("works_month"))
 	if s.Role == RoleEmployee {
@@ -47,7 +48,7 @@ func (a *App) timesheetsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		month := a.resolveWorksMonth(data.ViewedEmployeeID, worksMonthRaw)
 		a.fillTimesheetsMonthData(&data, s.User, month)
-		a.renderTimesheets(w, data)
+		a.renderTimesheets(w, r, data)
 		return
 	}
 	if s.Role == RoleAdmin {
@@ -76,7 +77,7 @@ func (a *App) timesheetsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		month := a.resolveWorksMonth(data.ViewedEmployeeID, worksMonthRaw)
 		a.fillTimesheetsMonthData(&data, s.User, month)
-		a.renderTimesheets(w, data)
+		a.renderTimesheets(w, r, data)
 		return
 	}
 	http.Error(w, "Forbidden", http.StatusForbidden)
@@ -277,7 +278,7 @@ func (a *App) addWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil || id <= 0 {
 			a.auditFailWorkEntry(r, s.User, "create", "work_entry(employee_id="+idStr+")", "invalid_employee_id")
-			a.renderTimesheetsError(w, s, "Некорректный идентификатор сотрудника")
+			a.renderTimesheetsError(w, r, s, "Некорректный идентификатор сотрудника")
 			return
 		}
 		employeeID = id
@@ -310,6 +311,7 @@ func (a *App) addWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 			AddWorkProjectID: parseOrZero(projectIDStr),
 			AddWorkComment:   comment,
 			AddWorkMode:      mode,
+			CSRFToken:        a.csrfTokenForTemplate(r),
 		}
 		targetID := employeeID
 		if s.Role == RoleEmployee {
@@ -390,23 +392,42 @@ func (a *App) addWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 		reRenderWithError("Сотрудник не найден")
 		return
 	}
-	last, err := getLastWorkEntry(a.db, employeeID)
+	prev, err := getPrevWorkEntry(a.db, employeeID, 0, workDate, startTime)
 	if err != nil {
-		log.Printf("ошибка чтения последней записи табеля: %v", err)
+		log.Printf("ошибка чтения предыдущей записи табеля: %v", err)
 		a.auditFailWorkEntryF(r, s.User, "create", "work_entry", "db_error: %v", err)
 		reRenderWithError("Не удалось проверить предыдущие записи")
 		return
 	}
-	if last != nil {
-		if workDate < last.WorkDate ||
-			(workDate == last.WorkDate && startTime < last.StartTime) {
+	if prev != nil {
+		if workDate < prev.WorkDate ||
+			(workDate == prev.WorkDate && startTime < prev.StartTime) {
 			a.auditFailWorkEntry(r, s.User, "create",
 				"work_entry(employee_id="+strconv.FormatInt(employeeID, 10)+
 					", date="+workDate+", start="+startTime+")",
 				"before_previous")
 			reRenderWithError("Дата и время новой записи не могут быть раньше предыдущей записи (" +
-				last.WorkDate + " " + last.StartTime + ")")
+				prev.WorkDate + " " + prev.StartTime + ")")
 			return
+		}
+		if workDate == prev.WorkDate {
+			prevEnd, ok := parseHHMM(prev.StartTime)
+			if !ok {
+				log.Printf("некорректное время в предыдущей записи id=%d", prev.ID)
+			} else {
+				prevEnd += int(prev.DurationMinutes)
+				newStart, ok := parseHHMM(startTime)
+				if ok && newStart < prevEnd {
+					a.auditFailWorkEntry(r, s.User, "create",
+						"work_entry(employee_id="+strconv.FormatInt(employeeID, 10)+
+							", date="+workDate+", start="+startTime+")",
+						"overlaps_previous")
+					reRenderWithError("Новая запись пересекается по времени с предыдущей (" +
+						prev.WorkDate + " " + prev.StartTime + ", длительность " +
+						strconv.FormatInt(prev.DurationMinutes, 10) + " мин.)")
+					return
+				}
+			}
 		}
 	}
 	durationMinutes, errMsg := computeDurationMinutes(startTime, mode, endTime, durHStr, durMStr)
@@ -457,17 +478,17 @@ func (a *App) editWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimSpace(r.FormValue("id"))
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
-		a.renderTimesheetsError(w, s, "Некорректный идентификатор записи")
+		a.renderTimesheetsError(w, r, s, "Некорректный идентификатор записи")
 		return
 	}
 	existing, err := getWorkEntry(a.db, id)
 	if err != nil {
 		if errors.Is(err, errWorkEntryNotFound) {
-			a.renderTimesheetsError(w, s, "Запись табеля не найдена")
+			a.renderTimesheetsError(w, r, s, "Запись табеля не найдена")
 			return
 		}
 		log.Printf("ошибка чтения записи табеля: %v", err)
-		a.renderTimesheetsError(w, s, "Не удалось сохранить изменения")
+		a.renderTimesheetsError(w, r, s, "Не удалось сохранить изменения")
 		return
 	}
 	if s.Role == RoleEmployee && existing.EmployeeID != s.EmployeeID {
@@ -476,7 +497,7 @@ func (a *App) editWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if !a.isEditableWorkDate(s.Role, existing.WorkDate) {
 		a.auditFailWorkEntry(r, s.User, "update", targetWorkEntry(existing), "record_locked")
-		a.renderTimesheetsError(w, s, "Запись старше установленного срока нельзя редактировать")
+		a.renderTimesheetsError(w, r, s, "Запись старше установленного срока нельзя редактировать")
 		return
 	}
 	workDate := strings.TrimSpace(r.FormValue("work_date"))
@@ -506,6 +527,7 @@ func (a *App) editWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 			EditWorkDurationH: durHStr,
 			EditWorkDurationM: durMStr,
 			EditWorkMode:      mode,
+			CSRFToken:         a.csrfTokenForTemplate(r),
 		}
 		targetID := existing.EmployeeID
 		if s.Role == RoleEmployee {
@@ -624,7 +646,7 @@ func (a *App) editWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, errWorkEntryNotFound) {
-			a.renderTimesheetsError(w, s, "Запись табеля не найдена")
+			a.renderTimesheetsError(w, r, s, "Запись табеля не найдена")
 			return
 		}
 		log.Printf("ошибка обновления записи табеля: %v", err)
@@ -654,17 +676,17 @@ func (a *App) deleteWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimSpace(r.FormValue("id"))
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
-		a.renderTimesheetsError(w, s, "Некорректный идентификатор записи")
+		a.renderTimesheetsError(w, r, s, "Некорректный идентификатор записи")
 		return
 	}
 	existing, err := getWorkEntry(a.db, id)
 	if err != nil {
 		if errors.Is(err, errWorkEntryNotFound) {
-			a.renderTimesheetsError(w, s, "Запись табеля не найдена")
+			a.renderTimesheetsError(w, r, s, "Запись табеля не найдена")
 			return
 		}
 		log.Printf("ошибка чтения записи табеля: %v", err)
-		a.renderTimesheetsError(w, s, "Не удалось удалить запись")
+		a.renderTimesheetsError(w, r, s, "Не удалось удалить запись")
 		return
 	}
 	if s.Role == RoleEmployee && existing.EmployeeID != s.EmployeeID {
@@ -673,17 +695,17 @@ func (a *App) deleteWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if !a.isEditableWorkDate(s.Role, existing.WorkDate) {
 		a.auditFailWorkEntry(r, s.User, "delete", targetWorkEntry(existing), "record_locked")
-		a.renderTimesheetsError(w, s, "Запись старше установленного срока нельзя удалить")
+		a.renderTimesheetsError(w, r, s, "Запись старше установленного срока нельзя удалить")
 		return
 	}
 	err = deleteWorkEntry(a.db, id)
 	if err != nil {
 		if errors.Is(err, errWorkEntryNotFound) {
-			a.renderTimesheetsError(w, s, "Запись табеля не найдена")
+			a.renderTimesheetsError(w, r, s, "Запись табеля не найдена")
 			return
 		}
 		log.Printf("ошибка удаления записи табеля: %v", err)
-		a.renderTimesheetsError(w, s, "Не удалось удалить запись")
+		a.renderTimesheetsError(w, r, s, "Не удалось удалить запись")
 		return
 	}
 	a.auditOKWorkEntry(r, s.User, "delete", id, existing.EmployeeID, existing.ProjectID, existing.WorkDate, existing.StartTime, existing.DurationMinutes)
@@ -695,11 +717,12 @@ func (a *App) deleteWorkEntryHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, redirect, http.StatusSeeOther)
 }
 
-func (a *App) renderTimesheetsError(w http.ResponseWriter, s Session, msg string) {
+func (a *App) renderTimesheetsError(w http.ResponseWriter, r *http.Request, s Session, msg string) {
 	data := TimesheetsData{
 		Username:   s.User,
 		Role:       s.Role,
 		EmployeeID: s.EmployeeID,
+		CSRFToken:  a.csrfTokenForTemplate(r),
 	}
 	a.fillTimesheetsMonthData(&data, s.User, normalizeWorksMonth(""))
 	data.WorkError = msg
@@ -709,7 +732,8 @@ func (a *App) renderTimesheetsError(w http.ResponseWriter, s Session, msg string
 	}
 }
 
-func (a *App) renderTimesheets(w http.ResponseWriter, data TimesheetsData) {
+func (a *App) renderTimesheets(w http.ResponseWriter, r *http.Request, data TimesheetsData) {
+	data.CSRFToken = a.csrfTokenForTemplate(r)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := a.tmpl.Timesheets.Execute(w, data); err != nil {
 		log.Printf("ошибка рендера timesheets: %v", err)
@@ -765,8 +789,11 @@ func computeDurationMinutes(startTime, mode, endTime, durHStr, durMStr string) (
 		}
 		duration = int64(endMin - startMin)
 	case "duration":
-		h, _ := strconv.ParseInt(durHStr, 10, 64)
-		m, _ := strconv.ParseInt(durMStr, 10, 64)
+		h, err1 := strconv.ParseInt(durHStr, 10, 64)
+		m, err2 := strconv.ParseInt(durMStr, 10, 64)
+		if err1 != nil || err2 != nil {
+			return 0, "Некорректная длительность"
+		}
 		if h < 0 || m < 0 || m > 59 {
 			return 0, "Некорректная длительность"
 		}
@@ -828,51 +855,56 @@ func targetWorkEntry(w *WorkEntry) string {
 		", duration_min=" + strconv.FormatInt(w.DurationMinutes, 10) + ")"
 }
 
+func getPrevWorkEntry(db *sql.DB, employeeID, excludeID int64, workDate, startTime string) (*WorkEntry, error) {
+	var w WorkEntry
+	err := db.QueryRow(`
+		SELECT w.id, w.employee_id, e.login, w.project_id, p.name, p.code,
+		       w.work_date, w.start_time, w.duration_minutes, w.comment
+		FROM work_entries w
+		JOIN employees e ON e.id = w.employee_id
+		JOIN projects  p ON p.id = w.project_id
+		WHERE w.employee_id = ? AND w.id <> ?
+		  AND (w.work_date < ? OR (w.work_date = ? AND w.start_time < ?))
+		ORDER BY w.work_date DESC, w.start_time DESC, w.id DESC
+		LIMIT 1
+	`, employeeID, excludeID, workDate, workDate, startTime).Scan(
+		&w.ID, &w.EmployeeID, &w.EmployeeLogin, &w.ProjectID,
+		&w.ProjectName, &w.ProjectCode, &w.WorkDate, &w.StartTime,
+		&w.DurationMinutes, &w.Comment)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &w, nil
+}
+
 func getPrevAndNextWorkEntries(db *sql.DB, employeeID, excludeID int64, workDate, startTime string) (prev, next *WorkEntry, err error) {
-	key := workDate + " " + startTime
-	query := `
-        SELECT w.id, w.employee_id, e.login, w.project_id, p.name, p.code,
-               w.work_date, w.start_time, w.duration_minutes, w.comment
-        FROM work_entries w
-        JOIN employees e ON e.id = w.employee_id
-        JOIN projects  p ON p.id = w.project_id
-        WHERE w.employee_id = ? AND w.id <> ?
-          AND (w.work_date || ' ' || w.start_time) < ?
-        ORDER BY w.work_date DESC, w.start_time DESC, w.id DESC
-        LIMIT 1
-    `
-	var pv WorkEntry
-	err = db.QueryRow(query, employeeID, excludeID, key).Scan(
-		&pv.ID, &pv.EmployeeID, &pv.EmployeeLogin, &pv.ProjectID,
-		&pv.ProjectName, &pv.ProjectCode, &pv.WorkDate, &pv.StartTime,
-		&pv.DurationMinutes, &pv.Comment)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	prev, err = getPrevWorkEntry(db, employeeID, excludeID, workDate, startTime)
+	if err != nil {
 		return nil, nil, err
 	}
-	if err == nil {
-		prev = &pv
+	var n WorkEntry
+	err = db.QueryRow(`
+		SELECT w.id, w.employee_id, e.login, w.project_id, p.name, p.code,
+		       w.work_date, w.start_time, w.duration_minutes, w.comment
+		FROM work_entries w
+		JOIN employees e ON e.id = w.employee_id
+		JOIN projects  p ON p.id = w.project_id
+		WHERE w.employee_id = ? AND w.id <> ?
+		  AND (w.work_date > ? OR (w.work_date = ? AND w.start_time > ?))
+		ORDER BY w.work_date ASC, w.start_time ASC, w.id ASC
+		LIMIT 1
+	`, employeeID, excludeID, workDate, workDate, startTime).Scan(
+		&n.ID, &n.EmployeeID, &n.EmployeeLogin, &n.ProjectID,
+		&n.ProjectName, &n.ProjectCode, &n.WorkDate, &n.StartTime,
+		&n.DurationMinutes, &n.Comment)
+	if errors.Is(err, sql.ErrNoRows) {
+		return prev, nil, nil
 	}
-	query = `
-        SELECT w.id, w.employee_id, e.login, w.project_id, p.name, p.code,
-               w.work_date, w.start_time, w.duration_minutes, w.comment
-        FROM work_entries w
-        JOIN employees e ON e.id = w.employee_id
-        JOIN projects  p ON p.id = w.project_id
-        WHERE w.employee_id = ? AND w.id <> ?
-          AND (w.work_date || ' ' || w.start_time) > ?
-        ORDER BY w.work_date ASC, w.start_time ASC, w.id ASC
-        LIMIT 1
-    `
-	var nx WorkEntry
-	err = db.QueryRow(query, employeeID, excludeID, key).Scan(
-		&nx.ID, &nx.EmployeeID, &nx.EmployeeLogin, &nx.ProjectID,
-		&nx.ProjectName, &nx.ProjectCode, &nx.WorkDate, &nx.StartTime,
-		&nx.DurationMinutes, &nx.Comment)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil {
 		return nil, nil, err
 	}
-	if err == nil {
-		next = &nx
-	}
-	return prev, next, nil
+	return prev, &n, nil
 }

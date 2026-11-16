@@ -32,7 +32,7 @@ func (a *App) addEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	groupIDStr := strings.TrimSpace(r.FormValue("group_id"))
 	target := targetEmployee(0, login)
 	reRenderWithAdd := func(errMsg string) {
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -180,7 +180,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
 		auditFail(r, user, "update", "employee(id="+idStr+")", "invalid_id")
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -200,7 +200,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	if gerr != nil {
 		if errors.Is(gerr, errEmployeeNotFound) {
 			auditFail(r, user, "update", targetEmployee(id, ""), "not_found")
-			a.renderConfigPageWith(w, user,
+			a.renderConfigPageWith(w, r, user,
 				groupsDir, groupsPage,
 				projectsSort, projectsDir, projectsPage, projectsSearch,
 				employeesSort, employeesDir, employeesPage,
@@ -213,7 +213,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("ошибка чтения сотрудника: %v", gerr)
 		auditFailF(r, user, "update", targetEmployee(id, ""), "db_error: %v", gerr)
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -226,7 +226,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	target := targetEmployee(id, existing.Login)
 	reRenderWithEdit := func(errMsg string) {
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -299,7 +299,16 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	err = updateEmployee(a.db, emp, password)
 	switch {
 	case err == nil:
-		auditOK(r, user, "update", target)
+		if password != "" {
+			killed := killSessionsByEmployeeID(id)
+			forgetErr := forgetUserDevices(a.db, existing.Login)
+			if forgetErr != nil {
+				log.Printf("не удалось сбросить устройства сотрудника %d: %v", id, forgetErr)
+			}
+			auditOK(r, user, "update", target+" killed_sessions="+strconv.Itoa(killed)+" devices_reset=1")
+		} else {
+			auditOK(r, user, "update", target)
+		}
 		http.Redirect(w, r, configRedirectURL(
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage,
@@ -312,7 +321,7 @@ func (a *App) editEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		reRenderWithEdit("Выбранный отдел не найден")
 	case errors.Is(err, errEmployeeNotFound):
 		auditFail(r, user, "update", target, "not_found")
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -345,7 +354,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
 		auditFail(r, user, "delete", "employee(id="+idStr+")", "invalid_id")
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -360,7 +369,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	if gerr != nil {
 		if errors.Is(gerr, errEmployeeNotFound) {
 			auditFail(r, user, "delete", targetEmployee(id, ""), "not_found")
-			a.renderConfigPageWith(w, user,
+			a.renderConfigPageWith(w, r, user,
 				groupsDir, groupsPage,
 				projectsSort, projectsDir, projectsPage, projectsSearch,
 				employeesSort, employeesDir, employeesPage,
@@ -373,7 +382,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("ошибка чтения сотрудника: %v", gerr)
 		auditFailF(r, user, "delete", targetEmployee(id, ""), "db_error: %v", gerr)
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -385,14 +394,11 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	target := targetEmployee(id, existing.Login)
-	
 	killedSessions := killSessionsByEmployeeID(id)
-	
 	forgetErr := forgetUserDevices(a.db, existing.Login)
 	if forgetErr != nil {
 		log.Printf("ошибка удаления устройств сотрудника %d: %v", id, forgetErr)
 	}
-
 	deletedEntries, err := deleteEmployee(a.db, id)
 	switch {
 	case err == nil:
@@ -411,7 +417,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 		), http.StatusSeeOther)
 	case errors.Is(err, errEmployeeNotFound):
 		auditFail(r, user, "delete", target, "not_found")
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -423,7 +429,7 @@ func (a *App) deleteEmployeeHandler(w http.ResponseWriter, r *http.Request) {
 	default:
 		log.Printf("ошибка удаления сотрудника: %v", err)
 		auditFailF(r, user, "delete", target, "db_error: %v", err)
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -452,7 +458,7 @@ func (a *App) killEmployeeSessionsHandler(w http.ResponseWriter, r *http.Request
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
 		auditFail(r, user, "kill_sessions", "employee(id="+idStr+")", "invalid_id")
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,
@@ -467,7 +473,7 @@ func (a *App) killEmployeeSessionsHandler(w http.ResponseWriter, r *http.Request
 	if gerr != nil {
 		if errors.Is(gerr, errEmployeeNotFound) {
 			auditFail(r, user, "kill_sessions", targetEmployee(id, ""), "not_found")
-			a.renderConfigPageWith(w, user,
+			a.renderConfigPageWith(w, r, user,
 				groupsDir, groupsPage,
 				projectsSort, projectsDir, projectsPage, projectsSearch,
 				employeesSort, employeesDir, employeesPage,
@@ -480,7 +486,7 @@ func (a *App) killEmployeeSessionsHandler(w http.ResponseWriter, r *http.Request
 		}
 		log.Printf("ошибка чтения сотрудника: %v", gerr)
 		auditFailF(r, user, "kill_sessions", targetEmployee(id, ""), "db_error: %v", gerr)
-		a.renderConfigPageWith(w, user,
+		a.renderConfigPageWith(w, r, user,
 			groupsDir, groupsPage,
 			projectsSort, projectsDir, projectsPage, projectsSearch,
 			employeesSort, employeesDir, employeesPage,

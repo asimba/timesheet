@@ -12,15 +12,17 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 )
 
 //go:embed web/* web/static/*
 var webFS embed.FS
 
 type App struct {
-	cfg  *Config
-	db   *sql.DB
-	tmpl *Templates
+	cfg   *Config
+	db    *sql.DB
+	tmpl  *Templates
+	login *loginRateLimiter
 }
 
 func main() {
@@ -54,18 +56,12 @@ func main() {
 		log.Fatalf("не удалось разобрать шаблоны: %v", err)
 	}
 	app.tmpl = tmpl
-	ctx, stopBackup := context.WithCancel(context.Background())
-	defer stopBackup()
+	app.login = newLoginRateLimiter()
+	ctx, stopBackground := context.WithCancel(context.Background())
+	defer stopBackground()
 	app.startBackupLoop(ctx)
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		s := <-sigCh
-		log.Printf("получен сигнал %s — завершаемся", s)
-		stopBackup()
-		lock.Release()
-		os.Exit(0)
-	}()
+	startSessionJanitor(ctx, 5*time.Minute)
+	app.login.startCleanup(ctx.Done())
 	staticRoot, err := fs.Sub(webFS, "web/static")
 	if err != nil {
 		log.Fatalf("не удалось получить поддерево web/static из embed.FS: %v", err)
@@ -104,7 +100,16 @@ func main() {
 	mux.HandleFunc("/employees/stats/individual", app.requireAdmin(app.individualEmployeeStatsExportHandler))
 	mux.HandleFunc("/api/generate-password", app.requireAdmin(app.generatePasswordHandler))
 	mux.HandleFunc("/api/next-employee-id", app.requireAdmin(app.nextEmployeeIDHandler))
+	handler := gzipMiddleware(app.csrfMiddleware(mux))
 	addr := cfg.ListenAddr + ":" + strconv.Itoa(cfg.ListenPort)
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadTimeout:       15 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 	log.Printf("Сервер запущен: http://%s", addr)
 	log.Printf("База данных: %s", cfg.DBPath)
 	if cfg.LogFile != "" {
@@ -115,9 +120,28 @@ func main() {
 		log.Printf("Резервирование БД: dir=%s каждые %d мин (хранить %d последних)",
 			cfg.BackupDir, cfg.BackupIntervalMinutes, cfg.BackupKeep)
 	}
-	handler := gzipMiddleware(mux)
-	if err := http.ListenAndServe(addr, handler); err != nil {
-		stopBackup()
-		log.Fatal(err)
+	errCh := make(chan error, 1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errCh <- err
+		}
+	}()
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	select {
+	case s := <-sigCh:
+		log.Printf("получен сигнал %s — завершаемся", s)
+	case err := <-errCh:
+		log.Printf("ошибка HTTP-сервера: %v", err)
 	}
+	stopBackground()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("ошибка graceful shutdown: %v", err)
+		if cerr := srv.Close(); cerr != nil {
+			log.Printf("ошибка принудительного закрытия сервера: %v", cerr)
+		}
+	}
+	log.Printf("сервер остановлен")
 }

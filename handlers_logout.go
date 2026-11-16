@@ -5,6 +5,10 @@ import (
 )
 
 func (a *App) logoutHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	if user, ok := currentUser(r); ok {
 		auditOK(r, user, "logout", "session")
 		if err := forgetUserDevices(a.db, user); err != nil {
