@@ -52,8 +52,8 @@
 
 ### 1. Клонировать
 ```
-git clone https://github.com/asimba/timesheets.git
-cd timeshhets
+git clone https://github.com/asimba/timesheet.git
+cd timesheet
 ```
 
 ### 2. Скопировать конфигурацию
