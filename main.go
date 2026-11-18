@@ -25,6 +25,44 @@ type App struct {
 	login *loginRateLimiter
 }
 
+func checkOrphanedReferences(db *sql.DB) {
+	type check struct {
+		name  string
+		query string
+	}
+	checks := []check{
+		{
+			name: "work_entries -> employees",
+			query: `SELECT COUNT(*) FROM work_entries w
+				LEFT JOIN employees e ON e.id = w.employee_id
+				WHERE e.id IS NULL`,
+		},
+		{
+			name: "work_entries -> projects",
+			query: `SELECT COUNT(*) FROM work_entries w
+				LEFT JOIN projects p ON p.id = w.project_id
+				WHERE p.id IS NULL`,
+		},
+		{
+			name: "employees -> groups",
+			query: `SELECT COUNT(*) FROM employees e
+				LEFT JOIN groups g ON g.id = e.group_id
+				WHERE g.id IS NULL`,
+		},
+	}
+	for _, c := range checks {
+		var n int64
+		if err := db.QueryRow(c.query).Scan(&n); err != nil {
+			log.Printf("диагностика ссылок: ошибка проверки %q: %v", c.name, err)
+			continue
+		}
+		if n > 0 {
+			log.Printf("ВНИМАНИЕ: обнаружены висячие ссылки (%s): %d записей. "+
+				"Целостность БД нарушена — обратитесь к администратору.", c.name, n)
+		}
+	}
+}
+
 func main() {
 	configPath := flag.String("config", "config.json", "путь к файлу конфигурации")
 	flag.Parse()
@@ -50,6 +88,7 @@ func main() {
 		log.Fatalf("не удалось открыть БД %q: %v", cfg.DBPath, err)
 	}
 	defer db.Close()
+	checkOrphanedReferences(db)
 	app := &App{cfg: cfg, db: db}
 	tmpl, err := buildTemplates(app)
 	if err != nil {

@@ -79,7 +79,13 @@ func initDB(path string) (*sql.DB, error) {
 	}
 	_, statErr := os.Stat(path)
 	created := os.IsNotExist(statErr)
-	db, err := sql.Open("sqlite", path)
+	dsn := path
+	if !strings.Contains(dsn, "?") {
+		dsn += "?_pragma=foreign_keys(1)"
+	} else {
+		dsn += "&_pragma=foreign_keys(1)"
+	}
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
@@ -87,6 +93,15 @@ func initDB(path string) (*sql.DB, error) {
 	if err := db.Ping(); err != nil {
 		db.Close()
 		return nil, err
+	}
+	var fk int
+	if err := db.QueryRow(`PRAGMA foreign_keys`).Scan(&fk); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("не удалось проверить PRAGMA foreign_keys: %w", err)
+	}
+	if fk != 1 {
+		db.Close()
+		return nil, errors.New("PRAGMA foreign_keys не включена — целостность ссылок не гарантируется")
 	}
 	if created {
 		log.Printf("файл БД не найден, создан новый: %s", path)
@@ -461,6 +476,9 @@ func updateEmployee(db *sql.DB, e Employee, password string) error {
 			WHERE id = ?
 		`, e.LastName, e.FirstName, e.MiddleName, e.GroupID, string(hash), e.ID)
 		if err != nil {
+			if isForeignKeyViolation(err) {
+				return errGroupNotFound
+			}
 			return err
 		}
 	} else {
@@ -470,6 +488,9 @@ func updateEmployee(db *sql.DB, e Employee, password string) error {
 			WHERE id = ?
 		`, e.LastName, e.FirstName, e.MiddleName, e.GroupID, e.ID)
 		if err != nil {
+			if isForeignKeyViolation(err) {
+				return errGroupNotFound
+			}
 			return err
 		}
 	}
