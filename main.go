@@ -139,7 +139,7 @@ func main() {
 	mux.HandleFunc("/employees/stats/individual", app.requireAdmin(app.individualEmployeeStatsExportHandler))
 	mux.HandleFunc("/api/generate-password", app.requireAdmin(app.generatePasswordHandler))
 	mux.HandleFunc("/api/next-employee-id", app.requireAdmin(app.nextEmployeeIDHandler))
-	handler := gzipMiddleware(app.csrfMiddleware(mux))
+	handler := gzipMiddleware(securityHeadersMiddleware(app.csrfMiddleware(mux)))
 	addr := cfg.ListenAddr + ":" + strconv.Itoa(cfg.ListenPort)
 	srv := &http.Server{
 		Addr:              addr,
