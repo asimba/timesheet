@@ -814,6 +814,50 @@ const projectsExportModal = setupModal('projectsExportModalOverlay', 'openProjec
 const projectStatsModal = setupModal('projectStatsModalOverlay', null, null, 'project-stats');
 const logoutModal = setupModal('logoutModalOverlay', 'openLogoutModalBtn', null, 'logout');
 const messageModal = setupModal('messageModalOverlay', null, null, 'message');
+const genPasswordBtn = document.getElementById('genPasswordBtn');
+if (genPasswordBtn) {
+genPasswordBtn.addEventListener('click', function() {
+fetch('/api/generate-password?length=8', {
+method: 'GET',
+headers: { 'Accept': 'application/json' },
+credentials: 'same-origin',
+})
+.then(function (response) {
+if (!response.ok) throw new Error('HTTP ' + response.status);
+return response.json();
+})
+.then(function (data) {
+document.getElementById('empPassword').value =
+String(data.password || '').slice(0, 8);
+})
+.catch(function (err) {
+console.error('Не удалось сгенерировать пароль:', err);
+alert('Не удалось сгенерировать пароль. Попробуйте позже.');
+});
+});
+}
+const genEditPasswordBtn = document.getElementById('genEditPasswordBtn');
+if (genEditPasswordBtn) {
+genEditPasswordBtn.addEventListener('click', function() {
+fetch('/api/generate-password?length=8', {
+method: 'GET',
+headers: { 'Accept': 'application/json' },
+credentials: 'same-origin',
+})
+.then(function (response) {
+if (!response.ok) throw new Error('HTTP ' + response.status);
+return response.json();
+})
+.then(function (data) {
+document.getElementById('editEmpPassword').value =
+String(data.password || '').slice(0, 8);
+})
+.catch(function (err) {
+console.error('Не удалось сгенерировать пароль:', err);
+alert('Не удалось сгенерировать пароль. Попробуйте позже.');
+});
+});
+}
 const empLoginInput = document.getElementById('empLogin');
 const empPasswordInput = document.getElementById('empPassword');
 const openEmployeeBtn = document.getElementById('openEmployeeModalBtn');
@@ -1311,34 +1355,6 @@ history.pushState(null, '', '/config?' + newParams.toString());
 })
 .catch(function (err) { console.error('AJAX-пагинация групп не удалась:', err); });
 }
-document.getElementById('genPasswordBtn').addEventListener('click', function() {
-fetch('/api/generate-password?length=8')
-.then(response => {
-if (!response.ok) throw new Error('Ошибка сети');
-return response.json();
-})
-.then(data => {
-document.getElementById('empPassword').value = String(data.password || '').slice(0, 8);
-})
-.catch(err => {
-console.error('Не удалось сгенерировать пароль:', err);
-alert('Не удалось сгенерировать пароль. Попробуйте позже.');
-});
-})
-document.getElementById('genEditPasswordBtn').addEventListener('click', function() {
-fetch('/api/generate-password?length=8')
-.then(response => {
-if (!response.ok) throw new Error('Ошибка сети');
-return response.json();
-})
-.then(data => {
-document.getElementById('editEmpPassword').value = String(data.password || '').slice(0, 8);
-})
-.catch(err => {
-console.error('Не удалось сгенерировать пароль:', err);
-alert('Не удалось сгенерировать пароль. Попробуйте позже.');
-});
-})
 groupsTable.querySelectorAll('a[data-ajax-sort="groups"]').forEach(function (link) {
 link.addEventListener('click', function (e) {
 if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
